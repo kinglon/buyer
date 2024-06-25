@@ -12,29 +12,20 @@ from bigintutil import BigIntUtil
 class AppleUtil:
     def __init__(self):
         self.auth_host = 'https://idmsa.apple.com'
+        self.apple_host = 'https://www.apple.com/jp'
         self.proxies = {"http": "", "https": ""}
+        self.cookies = {}
 
     def get_common_request_header(self):
+        cookies = '; '.join(f'{key}={value}' for key, value in self.cookies.items())
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Encoding': 'gzip, deflate, br, zstd',
-            'Origin': self.auth_host,
-            'Referer': self.auth_host,
+            'Origin': self.apple_host,
+            'Referer': self.apple_host,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-
-            'X-Apple-Auth-Attributes': 'JC2sm29mAKAQpv8h2UndqU+Dr4KalzfSlwHzW4HuAhcLKi7ea7bwIgBYesiL31YpGdPjmHunm+c9EopjIo77E8fpg7cKgIBD+agnH5gk002t84xvcmHD4q7qiVnqmkc4KBCoEGNCNj+BkZRszh9HS/dtaEL0rAkxjENbrch07jKOBA+blVYx0fEWXkSoKEZaHWO8t1L8ks9Gwf2rqzl8JwhbAuGXz6qczr2H1V5+NvtBBhAH85ozaFopgRZSGGy2iGAS3EsvQfDhxQcAFSS0oh2fiQ==',
-            'X-Apple-Domain-Id': '39',
-            'X-Apple-Frame-Id': 'auth-o7ggaaqz-mnv4-nsy1-58wj-qixcoisc',
-            'X-Apple-I-Fd-Client-Info': '{"U":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36","L":"zh-CN","Z":"GMT+08:00","V":"1.1","F":"Fla44j1e3NlY5BNlY5BSmHACVZXnNA9LL30OIFx_HrurJhBR.uMp4UdHz13Nlxfs.xLB.Tf1cK0DBRa6mmjoaUaW5BNlY5CGWY5BOgkLT0XxU..5GG"}',
-            'X-Apple-Locale': 'ja_JP',
-            'X-Apple-Oauth-Client-Id': 'a797929d224abb1cc663bb187bbcd02f7172ca3a84df470380522a7c6092118b',
-            'X-Apple-Oauth-Client-Type': 'firstPartyAuth',
-            'X-Apple-Oauth-Redirect-Uri': 'https://secure6.store.apple.com',
-            'X-Apple-Oauth-Response-Mode': 'web_message',
-            'X-Apple-Oauth-Response-Type': 'code',
-            'X-Apple-Oauth-State': 'auth-o7ggaaqz-mnv4-nsy1-58wj-qixcoisc',
-            'X-Apple-Widget-Key': 'a797929d224abb1cc663bb187bbcd02f7172ca3a84df470380522a7c6092118b'
+            'Cookie': cookies
         }
         return headers
 
@@ -120,7 +111,10 @@ class AppleUtil:
             uri = '/appleauth/auth/signin/complete?isRememberMeEnabled=true'
             url = self.auth_host + uri
             headers = self.get_common_request_header()
-            headers['X-APPLE-HC'] = '1:10:20240531133108:3d680cab1c02717f70c7b4a9617dee12::56'
+            headers['X-Apple-Oauth-Client-Type'] = 'firstPartyAuth'
+            headers['X-Apple-Oauth-Response-Mode'] = 'web_message'
+            headers['X-Apple-Oauth-Response-Type'] = 'code'
+            headers['X-Apple-Widget-Key'] = 'a797929d224abb1cc663bb187bbcd02f7172ca3a84df470380522a7c6092118b'
             body = {"c": c,
                     "accountName": account_name,
                     "m1": m1,
@@ -167,12 +161,28 @@ class AppleUtil:
         login_data = self.auth_complete(account_name, c, m1, m2)
         return login_data
 
-    def add_cart(self):
+    # 添加商品到购物车
+    # model 型号，如：iphone-15-pro
+    # product 产品，如：MTU93J(iphone 15 pro max, 1T, 天然钛)  MU713J(iphone 15 pro, 128G, 天然钛)
+    def add_cart(self, model, product):
         try:
-            url = 'https://securemetrics.apple.com/b/ss/applestoreww/1/JS-2.23.0/s85145633119268?AQB=1&ndh=1&pf=1&t=24%2F5%2F2024%2020%3A54%3A5%201%20-480&fid=7790B7456A6939C4-2F6AD5CFED9B4308&ce=UTF-8&cdp=2&cl=1800&pageName=AOS%3A%20home%2Fshop_iphone%2Ffamily%2Fiphone_15_pro%2Fselect&g=https%3A%2F%2Fwww.apple.com%2Fjp%2Fshop%2Fbuy-iphone%2Fiphone-15-pro%2F6.1%25E3%2582%25A4%25E3%2583%25B3%25E3%2583%2581%25E3%2583%2587%25E3%2582%25A3%25E3%2582%25B9%25E3%2583%2597%25E3%2583%25AC%25E3%2582%25A4-512gb-%25E3%2583%258A%25E3%2583%2581%25E3%2583%25A5%25E3%2583%25A9%25E3%2583%25AB%25E3%2583%2581%25E3%2582%25BF%25E3%2583%258B%25E3%2582%25A6%25E3%2583%25A0-sim%25E3%2583%2595%25E3%2583&r=https%3A%2F%2Fwww.apple.com%2Fjp%2Fiphone-15-pro%2F&cc=JPY&server=as-26.5.10&events=scAdd&products=iphone_15_pro%3BMTUK3%3B1%3B204800.00%3B%3B&h1=aos%3Ashop&l1=D%3Das_xs&v3=AOS%3A%20Japan%20Consumer&l3=D%3Das_tex&c4=D%3Dg&v4=D%3DpageName&c5=win32&v5=D%3DpageName%2B%22%7C%7CStep%201%7C%E3%83%90%E3%83%83%E3%82%B0%E3%81%AB%E8%BF%BD%E5%8A%A0%22&v6=D%3DpageName%2B%22%7C%7CStep%201%7C6_1INCH%20%3E%20NATURALTITANIUM%20%3E%20512GB%20%3E%20UNLOCKED_JP%20%3E%20TRADE_IN_NO%20%3E%20FULLPRICE%7Cfinal%22&c8=AOS%3A%20iPhone&c14=AOS%3A%20home%2Fshop_iphone%2Ffamily%2Fiphone_15_pro%2Fattach&v14=ja-jp&c20=AOS%3A%20JP%20Consumer&c40=10147&v45=iphone%3Aiphone_15_pro_6_1inch%3Enaturaltitanium%3E512gb%3Eno%20tradein%3Efullprice%3Eunlocked_jp%3Eapplecare%3Ano&v49=D%3Dr&v54=D%3Dg&v97=s.tl-o&pe=lnk_o&pev2=Step%201&c.&a.&activitymap.&page=AOS%3A%20home%2Fshop_iphone%2Ffamily%2Fiphone_15_pro%2Fselect&link=%28inner%20text%29%20%7C%20no%20href%20%7C%20summary&region=summary&pageIDType=1&.activitymap&.a&.c&s=1366x768&c=24&j=1.6&v=N&k=Y&bw=427&bh=607&-g=%25AA%25E3%2583%25BC&AQE=1'
+            # 获取atb token
+            url = self.apple_host + '/shop/beacon/atb'
             headers = self.get_common_request_header()
-            headers['Cookie'] = 'dssid2=e1737f88-6d40-4801-b25a-249cdcd3de05; dssf=1; pxro=1; as_sfa=MnxqcHxqcHx8amFfSlB8Y29uc3VtZXJ8aW50ZXJuZXR8MHwwfDE; as_uct=0; as_disa=AAAjAAABm1laUDouQaF5TP72s6sZZj8FbCJodyOTaVj-NAN9VPFR6aBeoOu6O95xTIMYtrzpAAIBi9GbcNf7GtpLiDSxXLO4xP3x0CeumpUz8i2IHHtDo8o=; geo=CN; s_cc=true; as_pcts=jNuHzXKS6tpkZKHRVVd8JLTeeOH-+gX4co-fZNKSNG2Q_4crOpa4Uijq2TkC-gSM:3EAlyCS9q_pR:v5_SMX4sa8BLoCO2zwl8-AmXJogHxvPjWL6t9vTvylepb8nFkNtmurgErXCAceAe1fjffIcNlg3ZU+w93FPVqkI4af; at_check=true; as_tex=~1~|564632:3:1726327369:JPN|3u/Ps/zhMTCjUD+k/xq/2RkV6d/UNA+XO4EGu52WCJE; as_rumid=5100dfc1-82a9-4f59-af48-a9933ccb158c; s_fid=7790B7456A6939C4-2F6AD5CFED9B4308; as_dc=ucp3; s_vi=[CS]v1|333CB525A64765B7-400006846510FD7E[CE]; s_sq=%5B%5BB%5D%5D'
-            response = requests.post(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies)
+            if not response.ok:
+                print("failed to update cookies when adding cart, error is {}".format(response))
+                return False
+            else:
+                self.cookies.update(response.cookies.get_dict())
+
+            # 加入购物车
+            atbtoken = self.cookies['as_atb']
+            atbtoken = atbtoken[atbtoken.rfind('|')+1:]
+            url = (self.apple_host + '/shop/buy-iphone/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
+                   .format(model, product, atbtoken))
+            headers = self.get_common_request_header()
+            response = requests.get(url, headers=headers, proxies=self.proxies)
             if not response.ok:
                 print("failed to add cart, error is {}".format(response))
                 return False
@@ -181,6 +191,21 @@ class AppleUtil:
         except requests.exceptions.RequestException as e:
             print("failed to add cart, error is {}".format(e))
             return False
+
+    # 获取购物车商品
+    def get_cart(self):
+        try:
+            url = self.apple_host + '/shop/bag'
+            headers = self.get_common_request_header()
+            response = requests.get(url, headers=headers, proxies=self.proxies)
+            if not response.ok:
+                print("failed to get cart, error is {}".format(response))
+                return None
+            else:
+                return response.content.decode('utf-8')
+        except requests.exceptions.RequestException as e:
+            print("failed to get cart, error is {}".format(e))
+            return None
 
     def check_credit_card(self, card_number):
         try:
@@ -354,13 +379,17 @@ def test_encrypt():
 
 def test_login():
     apple_util = AppleUtil()
-    account_info = apple_util.login('ii5pfw9mvfw9i@163.com', 'Qf223322')
+    # account_info = apple_util.login('ii5pfw9mvfw9i@163.com', 'Qf223322')
+    account_info = apple_util.login('suofeibuzi_992@163.com', 'Qf223322')
     print(account_info)
 
 
 def test_add_cart():
     apple_util = AppleUtil()
-    apple_util.add_cart()
+    apple_util.add_cart('iphone-15-pro', 'MU713J')  # MTU93J  MU713J
+    cart_info = apple_util.get_cart()
+    with open(r'C:\Users\zengxiangbin\Downloads\cart.html', 'w', encoding='utf-8') as f:
+        f.write(cart_info)
 
 
 def test_order():
