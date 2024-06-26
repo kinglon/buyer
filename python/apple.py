@@ -7,17 +7,30 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from bigintutil import BigIntUtil
+from datamodel import DataModel
+import urllib.parse
 
 
 class AppleUtil:
     def __init__(self):
         self.auth_host = 'https://idmsa.apple.com'
         self.apple_host = 'https://www.apple.com/jp'
+        self.appstore_host = 'https://secure6.store.apple.com/jp'
         self.proxies = {"http": "", "https": ""}
         self.cookies = {}
+        self.debug_cookie = ''
+
+    # 保存响应内容，调试使用
+    def debug_save_response(self, response):
+        content = response.content.decode('utf-8')
+        with open(r'C:\Users\zengxiangbin\Downloads\cart.html', 'w', encoding='utf-8') as f:
+            f.write(content)
 
     def get_common_request_header(self):
-        cookies = '; '.join(f'{key}={value}' for key, value in self.cookies.items())
+        if len(self.debug_cookie) > 0:
+            cookies = self.debug_cookie
+        else:
+            cookies = '; '.join(f'{key}={value}' for key, value in self.cookies.items())
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/plain, */*',
@@ -96,8 +109,8 @@ class AppleUtil:
                 print("failed to do auth init, error is {}".format(response))
                 return None
             else:
+                self.cookies.update(response.cookies.get_dict())
                 data = response.content.decode('utf-8')
-                # print("init data: {}".format(data))
                 data = json.loads(data)
                 return data
         except requests.exceptions.RequestException as e:
@@ -105,7 +118,7 @@ class AppleUtil:
             return None
 
     # 登录第2阶段
-    # 返回账号信息，从Set-Cookie的myacinfo中获得
+    # 返回 True or False
     def auth_complete(self, account_name, c, m1, m2):
         try:
             uri = '/appleauth/auth/signin/complete?isRememberMeEnabled=true'
@@ -125,25 +138,20 @@ class AppleUtil:
             response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
             if not response.ok:
                 print("failed to do auth complete, error is {}".format(response))
-                return None
+                return False
             else:
-                data = response.content.decode('utf-8')
-                data = json.loads(data)
-                if 'authType' in data:
-                    # 从Set-Cookie中获取账号信息
-                    cookies = response.headers.get('Set-Cookie')
-                    begin = cookies.find('myacinfo=')
-                    if begin >= 0:
-                        begin += len('myacinfo=')
-                        end = cookies.find(';', begin)
-                        return cookies[begin:end]
-                return None
+                cookies = response.cookies.get_dict()
+                if 'myacinfo' in cookies:
+                    self.cookies.update(cookies)
+                    return True
+                else:
+                    return False
         except requests.exceptions.RequestException as e:
             print("failed to do auth complete, error is {}".format(e))
-            return None
+            return False
 
     # 登录，分2个阶段：获取初始化数据，再登录
-    # 返回账号信息，从Set-Cookie的myacinfo中获得
+    # 返回 bool
     def login(self, account_name, password):
         # 获取初始化数据
         private_value, public_value = AppleUtil.get_private_public_value()
@@ -158,8 +166,7 @@ class AppleUtil:
         m1, m2 = self.get_complete_data(account_name, password, salt, iteration, private_value, public_value,
                                         server_public_value)
 
-        login_data = self.auth_complete(account_name, c, m1, m2)
-        return login_data
+        return self.auth_complete(account_name, c, m1, m2)
 
     # 添加商品到购物车
     # model 型号，如：iphone-15-pro
@@ -174,7 +181,11 @@ class AppleUtil:
                 print("failed to update cookies when adding cart, error is {}".format(response))
                 return False
             else:
-                self.cookies.update(response.cookies.get_dict())
+                cookies = response.cookies.get_dict()
+                if 'as_atb' not in cookies:
+                    return False
+                else:
+                    self.cookies.update(cookies)
 
             # 加入购物车
             atbtoken = self.cookies['as_atb']
@@ -187,60 +198,170 @@ class AppleUtil:
                 print("failed to add cart, error is {}".format(response))
                 return False
             else:
+                self.cookies.update(response.cookies.get_dict())
                 return True
         except requests.exceptions.RequestException as e:
             print("failed to add cart, error is {}".format(e))
             return False
 
-    # 获取购物车商品
-    def get_cart(self):
+    # 查询是否有货
+    # location 邮编，如：104-8125
+    # product 产品，如：MTU93J/A(iphone 15 pro max, 1T, 天然钛)  MU713J/A(iphone 15 pro, 128G, 天然钛)
+    def query_product_available(self, location, product):
+        try:
+            url = (self.apple_host + '/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0={}/A&location={}'
+                   .format(product, location))
+            headers = self.get_common_request_header()
+            response = requests.get(url, headers=headers, proxies=self.proxies)
+            if not response.ok:
+                print("failed to query product available, error is {}".format(response))
+                return False
+            else:
+                data = response.content.decode('utf-8')
+                root = json.loads(data)
+                stores = root['body']['content']['pickupMessage']['stores']
+                for store in stores:
+                    if store['retailStore']['availableNow']:
+                        return True
+                return False
+        except requests.exceptions.RequestException as e:
+            print("failed to query product available, error is {}".format(e))
+            return False
+
+    # 打开购物车
+    # 返回x-aos-stk的值
+    def open_cart(self):
         try:
             url = self.apple_host + '/shop/bag'
             headers = self.get_common_request_header()
             response = requests.get(url, headers=headers, proxies=self.proxies)
             if not response.ok:
-                print("failed to get cart, error is {}".format(response))
+                print("failed to open cart, error is {}".format(response))
                 return None
             else:
-                return response.content.decode('utf-8')
+                self.cookies.update(response.cookies.get_dict())
+                data = response.content.decode('utf-8')
+                begin = data.find('x-aos-stk":')
+                if begin > 0:
+                    begin = data.find('"', begin + len('x-aos-stk":'))
+                    if begin > 0:
+                        end = data.find('"', begin + 1)
+                        x_aos_stk = data[begin+1: end]
+                        return x_aos_stk
+                return None
         except requests.exceptions.RequestException as e:
-            print("failed to get cart, error is {}".format(e))
+            print("failed to open cart, error is {}".format(e))
             return None
 
-    def check_credit_card(self, card_number):
+    # 进入下单流程
+    # 返回ssi
+    def check_now(self, x_aos_stk):
         try:
-            url = 'https://secure8.store.apple.com/jp/shop/checkoutx/billing?_a=checkCreditCardTypeAction&_m=checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0'
-            headers = {'Content-Type': 'application/x-www-form-urlencoded',
-                       'Accept': 'application/json, text/plain, */*', 'Accept-Encoding': 'gzip, deflate, br, zstd',
-                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                       'Origin': 'https://secure8.store.apple.com',
-                       'Referer': 'https://secure8.store.apple.com/jp/shop/checkout?_s=Billing-init',
-                       'Cookie': 'dssid2=e1737f88-6d40-4801-b25a-249cdcd3de05; dssf=1; as_tex=~1~|547472:1:1720303320:USA|8tl/pg7UrFynAkX6Y0Pvc49nI15a+Q7a4p8Rus7Z8rQ; pxro=1; as_sfa=MnxqcHxqcHx8amFfSlB8Y29uc3VtZXJ8aW50ZXJuZXR8MHwwfDE; as_uct=0; geo=CN; s_cc=true; as_pcts=TGihRP6latlhmOcem2AvgTWVxgiKU7s7yVNw-lyMoufrrCRlYgixazjPZjuyYYmxXadPpicVE7DkSepOZEvgZjxoPgnfW1Msjo90mEHBfUyENobs+T1wjCLHCs-VNwILA4wrUNfvwlQQsm2PP7sW3cp47qwDfUa0p4t_uB2I; at_check=true; as_rumid=936b6e56-bea2-442d-bd5e-c856941de6e8; dslang=JP-JA; site=JPN; as_cn=~7TA2AxBhMPnrepuXgX5Rx5omb7TuLmtGvFs8KSqk-ME=; as_loc=c82ad3b931014cf632200f5f0367479192c5dbc172db3e6954fb0896c2140a3a5a936666b546c9833bb6f386a5dece332cfe086faae0de548059089372f46494d1b4dc5c7da9a47c47be2c8bcf532be96e8457a1871a2d8682aed2ec65d3797b3ab3ed2d453b603ec66210f37f77d5c4; rtsid=%7BJP%3D%7Bt%3Da%3Bi%3DR079%3B%7D%3B%7D; as_dc=ucp5; s_fid=1355A9866141D8FA-31F8EA28D2C3B466; s_vi=[CS]v1|332E34868CD8D581-60001418254370F3[CE]; as_disa=AAAjAAABKY54Eci6DGrDTJd9nXI1YATavCZE640dkzcAvsu1y4uH8l-XwueWZ0zyjWaVvB4GAAIBbeMv8ihKB98KIMjMI-m0z1aHP5CXTVFP4cz6BGSmZac=; as_rec=9657cbef12fb9b072fba16246736ce1e544f9f7215ce76e7f18dce4eafc41ad5dc0de7f643945d1fa1baa23b74e635e3380c7d0c0fe2077adaf22133482afc0482cb98930474e01b0078311122a31047; as_ltn_jp=AAQEAMAsYfz8j_u80nWm9JxszbmOBX8h3QGr35CalH8kv4tvAPd6qxJ3-vVO54NxLUv4KChSpoGYs2JUS-lQO7agi9BZ8ycuTLg; s_sq=applestoreww%3D%2526c.%2526a.%2526activitymap.%2526page%253DAOS%25253A%252520Checkout%25252FPayment%2526link%253D159%25252C800visa%25252C%252520mastercard%25252C%252520amex%25252C%252520%25252C%252520jcb%252520%252528inner%252520text%252529%252520%25257C%252520no%252520href%252520%25257C%252520body%2526region%253Dbody%2526pageIDType%253D1%2526.activitymap%2526.a%2526.c%2526pid%253DAOS%25253A%252520Checkout%25252FPayment%2526pidt%253D1%2526oid%253Dfunctionkd%252528%252529%25257B%25257D%2526oidt%253D2%2526ot%253DDIV',
-                       'Modelversion': 'v2', 'x-aos-model-page': 'checkoutPage',
-                       'x-aos-stk': 'QVkzS5yCLePx_y06-GHMzaOi-4M', 'X-Requested-With': 'Fetch'}
-            # Cookie是来自于fulfillment请求的SetCookie
-            # headers['Cookie'] = 's_vi=[CS]v1|332E34868CD8D581-60001418254370F3[CE];dssid2=e1737f88-6d40-4801-b25a-249cdcd3de05'
-            # headers['Syntax'] = 'graviton'
-            public_key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB'
-            cipher_text = AppleUtil.encrypt(public_key, '5353074484065468'.encode('utf-8'))
-            body = 'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber=true&checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection=5353%2007&checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType=MASTERCARD&checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode=&checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration=&checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber=%7B%22cipherText%22%3A%22{}%3D%3D%22%2C%22publicKeyHash%22%3A%22DsCuZg%2B6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs%3D%22%7D'.format(
-                cipher_text)
+            url = self.apple_host + '/shop/bagx/checkout_now?_a=checkout&_m=shoppingCart.actions'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'cart'
+            body = 'shoppingCart.recommendations.recommendedItem.part=&shoppingCart.bagSavedItems.part=&shoppingCart.bagSavedItems.listId=&shoppingCart.bagSavedItems.childPart=&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.isIntentToGift=false&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.itemQuantity.quantity=1&shoppingCart.locationConsent.locationConsent=false&shoppingCart.summary.promoCode.promoCode=&shoppingCart.actions.fcscounter=&shoppingCart.actions.fcsdata='
             response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
-            # s = requests.Session()
-            # s.mount('https://', requests.adapters.HTTPAdapter(max_retries=1))
-            #
-            # req = requests.Request('POST', url, headers = headers, data = body)
-            # prep = req.prepare()
-            # response = s.send(prep)
             if not response.ok:
-                print("failed to do auth federate, error is {}".format(response))
-                return False
+                print("failed to check now, error is {}".format(response))
+                return None
             else:
                 data = response.content.decode('utf-8')
-                data = json.loads(data)
-                return data
+                root = json.loads(data)
+                url = root['head']['data']['url']
+                if url.find('ssi=') != -1:
+                    self.cookies.update(response.cookies.get_dict())
+                    parsed_url = urllib.parse.urlparse(url)
+                    ssi = urllib.parse.parse_qs(parsed_url.query)['ssi'][0]
+                    return ssi
+                else:
+                    return None
         except requests.exceptions.RequestException as e:
-            print("failed to get the demand list, error is {}".format(e))
+            print("failed to check now, error is {}".format(e))
+            return None
+
+    # 绑定账号
+    def bind_account(self, x_aos_stk, ssi):
+        try:
+            url = self.appstore_host + '/shop/signIn/idms/authx?ssi={}&up=true'.format(ssi)
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'signInPage'
+            body = 'deviceID=TF1%3B015%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3BMozilla%3BNetscape%3B5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3B20030107%3Bundefined%3Btrue%3B%3Btrue%3BWin32%3Bundefined%3BMozilla%2F5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3Bzh-CN%3Bundefined%3Bsecure6.store.apple.com%3Bundefined%3Bundefined%3Bundefined%3Bundefined%3Bfalse%3Bfalse%3B1719370448096%3B8%3B2005%2F6%2F7%252021%253A33%253A44%3B1366%3B768%3B%3B%3B%3B%3B%3B%3B%3B-480%3B-480%3B2024%2F6%2F26%252010%253A54%253A08%3B24%3B1366%3B728%3B0%3B0%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B25%3B&grantCode='
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            if not response.ok:
+                print("failed to bind account, error is {}".format(response))
+                return False
+
+            self.cookies.update(response.cookies.get_dict())
+            data = response.content.decode('utf-8')
+            root = json.loads(data)
+            pltn = root['head']['data']['args']['pltn']
+
+            url = self.appstore_host + '/shop/checkout/start'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            body = 'pltn=50127CEB'
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            if not response.ok:
+                print("failed to bind account, error is {}".format(response))
+                return False
+
+            self.cookies.update(response.cookies.get_dict())
+            return True
+        except requests.exceptions.RequestException as e:
+            print("failed to bind account, error is {}".format(e))
+            return False
+
+    def create_order(self, x_aos_stk, data_model):
+        try:
+            url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToUnknown&_m=checkout.billing'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            card_number_for_detection = data_model.credit_card_no[0:4] + ' ' + data_model.credit_card_no[4:6]
+            public_key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB'
+            cipher_text = AppleUtil.encrypt(public_key, data_model.credit_card_no.encode('utf-8'))
+            card_number = '{"cipherText":"%s==","publicKeyHash":"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=="}' % cipher_text
+            body = {
+                "checkout.billing.billingOptions.selectBillingOption": 'CREDIT',
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.city': data_model.city,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.state': data_model.state,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.lastName': data_model.last_name,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.firstName': data_model.first_name,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.countryCode': 'JP',
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street': data_model.street,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.postalCode': data_model.postal_code,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street2': data_model.street2,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber': 'true',
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection': card_number_for_detection,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType': 'MASTERCARD',
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode': data_model.cvv,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration': data_model.expired_date,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber': card_number,
+                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.creditInstallment.selectedInstallment': '1',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID': '',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': ''
+            }
+            body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}' for k, v in body.items())
+
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            if not response.ok:
+                print("failed to create order, error is {}".format(response))
+                return False
+            else:
+                self.cookies.update(response.cookies.get_dict())
+                return True
+        except requests.exceptions.RequestException as e:
+            print("failed to create order, error is {}".format(e))
             return False
 
     # bytes进行base64编码
@@ -379,27 +500,88 @@ def test_encrypt():
 
 def test_login():
     apple_util = AppleUtil()
-    # account_info = apple_util.login('ii5pfw9mvfw9i@163.com', 'Qf223322')
-    account_info = apple_util.login('suofeibuzi_992@163.com', 'Qf223322')
-    print(account_info)
+    # apple_util.login('ii5pfw9mvfw9i@163.com', 'Qf223322')
+    apple_util.login('suofeibuzi_992@163.com', 'Qf223322')
 
 
 def test_add_cart():
     apple_util = AppleUtil()
-    apple_util.add_cart('iphone-15-pro', 'MU713J')  # MTU93J  MU713J
-    cart_info = apple_util.get_cart()
-    with open(r'C:\Users\zengxiangbin\Downloads\cart.html', 'w', encoding='utf-8') as f:
-        f.write(cart_info)
+    apple_util.add_cart('iphone-15-pro', 'MU713J')
+    apple_util.open_cart()
 
 
-def test_order():
+# 测试全流程
+def test():
     apple_util = AppleUtil()
-    apple_util.check_credit_card('5353079623725781')
+
+    data_model = DataModel()
+    data_model.account = 'suofeibuzi_992@163.com'
+    data_model.password = 'Qf223322'
+    data_model.first_name = 'Ye'
+    data_model.last_name = 'Jeric'
+    data_model.telephone = '08054897787'
+    data_model.email = '415571971@qq.com'
+    data_model.credit_card_no = '5353074484065468'
+    data_model.expired_date = '03/26'
+    data_model.cvv = '165'
+    data_model.postal_code = '104-8125'
+    data_model.state = '福建'
+    data_model.city = 'Fuzhou'
+    data_model.street = 'Changshan'
+    data_model.street2 = 'Zhaixianyuan'
+    data_model.giftcard_no = ''
+
+    apple_util.debug_cookie = 'dslang=US-EN; site=USA; aasp=938553B9C43BA16CA98D5B0C8AAE8AE135AC87686D09C3EA8F9EF6648ACA6B74D38B8B8393BFE58B375D5822725689A7E8A3ADB6B5630317F3C23CC90D50C167E8FC7469D6A5F5DF0567D29030ED218DA514F4B7AC75153A6488EC1596C397E6FC45D8DC7AF507F070076241054BA2BD8DDBA51A8B8C6193; myacinfo=DAWTKNV323952cf8084a204fb20ab2508441a07d02d3afc6e9b29a4bd7d790eaf96847fd7b89635877e2486a4425154db0f965f7857a5fd10ae6125107802a5fd823fd47cea76d8833d986f31636ff79c189d5c49fc1f2d8f5d7f316b5cea6a0ffd7a635f392760d2ea0de5b40895e00c2884678427bbf308e793bf02c3a271ae1a06aab2b068cbd497a39c3bfbcad997fa95dac9d49c0a537acc1af690ea6e7d0ce18df85d7e218442404ff9c3f1b79dd16d5064d41a5eafe3b258bd62542b8445dc2ed8477fd5923e1c2558729083ed9b3b7e67a5d2a0b3a4e454b98fbe506d6f5d10d52ea082516514d744b1b87fbfe06efa86d59f9532bfc8b90579468c089f5c11a89aff1fd29f27a764350dbf563d5beefd5dbc5cf21cf7881f54fcc1492b1191c941711bc73854ee6451373cabb949bbcc7dda85015d462c2e0c176b3d9878bedfbc26d3a9840215f6f3adb0074c0e84fd3d8046dd8a32f0c2d9ac9c7a7662a1a3de0dbff05623bd60ecef5c4ace5f89a3f53f591805657cb366ff8a3aeca2398408fb48f8f06cfd5a84186df9e89f1885e952b6ade852ea13ed3e3679c9106dc05816577683d6dc7c63c169c7dbbd85f0a429f65ebd118dca48f76c81819d04cc0b7f2f543f39c548784f5057a70e58e7217bdeb13db20c258d79a71d856d1684ed49410af05a5f7ff8e562baa5381f0a72f854d609e6d34429363a51c57f5b71b6d585a47V3; as_dc=ucp3; as_pcts=gfn8otNGkuKzUoQK3o-Go1XfpDu5-yaObSRXhBMEQxNj7o-T68gUycWvHwk__udJZIHV9bSJVf_RA5QWMRKN5jHP-eWSwOU1br_fWqXhi9FbAbPnrZF2Wa_:zCE+epsu0uG_XQo9vLL2lrMNz4YhKNeJB8pvf_VM6oKIsWly; dssf=1; dssid2=5a23e909-22b9-4b4d-bbfb-a6b20ef477d5; as_atb=1.0|MjAyNC0wNi0yNiAwODozNDozMA|5fd621bc627b5c67c408d007fd18cef3bd67e0e9'
+    x_aos_stk = 'Aw3lphcB243vbUP8tXZFyrNe061GJ7JSn-kkcrP2rzo'
+    need_comment = True
+    if not need_comment:
+        # 登录
+        if not apple_util.login(data_model.account, data_model.password):
+            return
+
+        # 添加商品
+        model = 'iphone-15-pro'
+        product = 'MTU93J'
+        if not apple_util.add_cart(model, product):
+            return
+
+        cookies = '; '.join(f'{key}={value}' for key, value in apple_util.cookies.items())
+        print('cookie after add cart')
+        print(cookies)
+
+        # 查询是否有货
+        if not apple_util.query_product_available(data_model.postal_code, product):
+            return
+
+        # 打开购物车
+        x_aos_stk = apple_util.open_cart()
+        if x_aos_stk is None:
+            return
+        print('x_aos_stk={}'.format(x_aos_stk))
+
+    # 进入购物流程
+    ssi = apple_util.check_now(x_aos_stk)
+    if ssi is None :
+        return
+
+    # 绑定账号
+    if not apple_util.bind_account(x_aos_stk, ssi):
+        return
+
+    cookies = '; '.join(f'{key}={value}' for key, value in apple_util.cookies.items())
+    print('cookie after check now')
+    print(cookies)
+
+    if not apple_util.create_order(x_aos_stk, data_model):
+        return
 
 
 if __name__ == '__main__':
     # test_encrypt()
     # test_login()
-    test_add_cart()
+    # test_add_cart()
+    # test_query_product_available()
+    # test_login_and_addcart()
     # test_order()
+    test()
     print('done')
