@@ -15,13 +15,14 @@ class AppleUtil:
     def __init__(self):
         self.auth_host = 'https://idmsa.apple.com'
         self.apple_host = 'https://www.apple.com/jp'
-        self.appstore_host = 'https://secure6.store.apple.com/jp'
+        self.appstore_host = 'https://secure5.store.apple.com/jp'
         self.proxies = {"http": "", "https": ""}
         self.cookies = {}
         self.debug_cookie = ''
 
     # 保存响应内容，调试使用
-    def debug_save_response(self, response):
+    @staticmethod
+    def debug_save_response(response):
         content = response.content.decode('utf-8')
         with open(r'C:\Users\zengxiangbin\Downloads\cart.html', 'w', encoding='utf-8') as f:
             f.write(content)
@@ -138,20 +139,19 @@ class AppleUtil:
             response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
             if not response.ok:
                 print("failed to do auth complete, error is {}".format(response))
-                return False
+                return None
             else:
                 cookies = response.cookies.get_dict()
                 if 'myacinfo' in cookies:
-                    self.cookies.update(cookies)
-                    return True
+                    return cookies['myacinfo']
                 else:
-                    return False
+                    return None
         except requests.exceptions.RequestException as e:
             print("failed to do auth complete, error is {}".format(e))
-            return False
+            return None
 
     # 登录，分2个阶段：获取初始化数据，再登录
-    # 返回 bool
+    # 返回 myacinfo 的 cookie值
     def login(self, account_name, password):
         # 获取初始化数据
         private_value, public_value = AppleUtil.get_private_public_value()
@@ -185,6 +185,8 @@ class AppleUtil:
                 if 'as_atb' not in cookies:
                     return False
                 else:
+                    if 'as_dc' in cookies:
+                        cookies['as_dc'] = 'ucp2'
                     self.cookies.update(cookies)
 
             # 加入购物车
@@ -284,10 +286,13 @@ class AppleUtil:
             return None
 
     # 绑定账号
-    def bind_account(self, x_aos_stk, ssi):
+    # 返回参数 pltn
+    def bind_account(self, account_info, x_aos_stk, ssi):
         try:
             url = self.appstore_host + '/shop/signIn/idms/authx?ssi={}&up=true'.format(ssi)
+
             headers = self.get_common_request_header()
+            headers['Cookie'] += ';myacinfo={}'.format(account_info)
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
@@ -296,29 +301,36 @@ class AppleUtil:
             response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
             if not response.ok:
                 print("failed to bind account, error is {}".format(response))
-                return False
+                return None
 
             self.cookies.update(response.cookies.get_dict())
             data = response.content.decode('utf-8')
             root = json.loads(data)
             pltn = root['head']['data']['args']['pltn']
+            return pltn
+        except requests.exceptions.RequestException as e:
+            print("failed to bind account, error is {}".format(e))
+            return None
 
+    # 开始下订单
+    def checkout_start(self, pltn):
+        try:
             url = self.appstore_host + '/shop/checkout/start'
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            body = 'pltn=50127CEB'
+            body = 'pltn={}'.format(pltn)
             response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
             if not response.ok:
-                print("failed to bind account, error is {}".format(response))
+                print("failed to checkout start, error is {}".format(response))
                 return False
 
             self.cookies.update(response.cookies.get_dict())
             return True
         except requests.exceptions.RequestException as e:
-            print("failed to bind account, error is {}".format(e))
+            print("failed to checkout start, error is {}".format(e))
             return False
 
-    def create_order(self, x_aos_stk, data_model):
+    def billing(self, x_aos_stk, data_model):
         try:
             url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToUnknown&_m=checkout.billing'
             headers = self.get_common_request_header()
@@ -531,13 +543,14 @@ def test():
     data_model.street2 = 'Zhaixianyuan'
     data_model.giftcard_no = ''
 
-    apple_util.debug_cookie = 'dslang=US-EN; site=USA; aasp=938553B9C43BA16CA98D5B0C8AAE8AE135AC87686D09C3EA8F9EF6648ACA6B74D38B8B8393BFE58B375D5822725689A7E8A3ADB6B5630317F3C23CC90D50C167E8FC7469D6A5F5DF0567D29030ED218DA514F4B7AC75153A6488EC1596C397E6FC45D8DC7AF507F070076241054BA2BD8DDBA51A8B8C6193; myacinfo=DAWTKNV323952cf8084a204fb20ab2508441a07d02d3afc6e9b29a4bd7d790eaf96847fd7b89635877e2486a4425154db0f965f7857a5fd10ae6125107802a5fd823fd47cea76d8833d986f31636ff79c189d5c49fc1f2d8f5d7f316b5cea6a0ffd7a635f392760d2ea0de5b40895e00c2884678427bbf308e793bf02c3a271ae1a06aab2b068cbd497a39c3bfbcad997fa95dac9d49c0a537acc1af690ea6e7d0ce18df85d7e218442404ff9c3f1b79dd16d5064d41a5eafe3b258bd62542b8445dc2ed8477fd5923e1c2558729083ed9b3b7e67a5d2a0b3a4e454b98fbe506d6f5d10d52ea082516514d744b1b87fbfe06efa86d59f9532bfc8b90579468c089f5c11a89aff1fd29f27a764350dbf563d5beefd5dbc5cf21cf7881f54fcc1492b1191c941711bc73854ee6451373cabb949bbcc7dda85015d462c2e0c176b3d9878bedfbc26d3a9840215f6f3adb0074c0e84fd3d8046dd8a32f0c2d9ac9c7a7662a1a3de0dbff05623bd60ecef5c4ace5f89a3f53f591805657cb366ff8a3aeca2398408fb48f8f06cfd5a84186df9e89f1885e952b6ade852ea13ed3e3679c9106dc05816577683d6dc7c63c169c7dbbd85f0a429f65ebd118dca48f76c81819d04cc0b7f2f543f39c548784f5057a70e58e7217bdeb13db20c258d79a71d856d1684ed49410af05a5f7ff8e562baa5381f0a72f854d609e6d34429363a51c57f5b71b6d585a47V3; as_dc=ucp3; as_pcts=gfn8otNGkuKzUoQK3o-Go1XfpDu5-yaObSRXhBMEQxNj7o-T68gUycWvHwk__udJZIHV9bSJVf_RA5QWMRKN5jHP-eWSwOU1br_fWqXhi9FbAbPnrZF2Wa_:zCE+epsu0uG_XQo9vLL2lrMNz4YhKNeJB8pvf_VM6oKIsWly; dssf=1; dssid2=5a23e909-22b9-4b4d-bbfb-a6b20ef477d5; as_atb=1.0|MjAyNC0wNi0yNiAwODozNDozMA|5fd621bc627b5c67c408d007fd18cef3bd67e0e9'
-    x_aos_stk = 'Aw3lphcB243vbUP8tXZFyrNe061GJ7JSn-kkcrP2rzo'
-    need_comment = True
+    need_comment = False
     if not need_comment:
         # 登录
-        if not apple_util.login(data_model.account, data_model.password):
+        account_info = apple_util.login(data_model.account, data_model.password)
+        if account_info is None:
             return
+        print('account info')
+        print(account_info)
 
         # 添加商品
         model = 'iphone-15-pro'
@@ -558,21 +571,27 @@ def test():
         if x_aos_stk is None:
             return
         print('x_aos_stk={}'.format(x_aos_stk))
+    else:
+        account_info = ''
+        apple_util.debug_cookie = 'dslang=US-EN; site=USA; aasp=6E931A022EF4AA386840B4525C00403A2CE8778FC4585C868A3E1FC505AA16F05AE6E184A9BB0CECB207CBE3ADADBADEADFC5F60D6395A3BAA76C261A104FDD0319A06CF9A2B477C048E2751EEF20A64ADEDFC65287DE98B7A7DBD390DDA2B7F71853BA6EAFE921A26B42D650CF0E3BCBE27C8DADF09486C; myacinfo=DAWTKNV323952cf8084a204fb20ab2508441a07d02d39bd90a1a4c7e1158160ba12f9815dda262b6aa477054e016d4dd8be8edc63e0437265a42663e455e3467221b17117236065927a38667f01440b276dc95d8777685a55f8f9da83cbfdb61a0e4c918ecd63738d456c9bd9df768ebf63d77cc18129588ea317688a22ad38c24f67686a748f552bf5f0627d37417a2397116a239cd221f8fb78c5749aed06b3828d13a66bb32af2bd61477434d37efa02083d628eaa63f6e85fd61f4bfd83a6b4001c893e00f1bc24855088121bc9951a7afa7e381495f33293c4a18899991b627604906d9736c4bcb2ce22b313105ccd204a64bef9443c88ac333b885fdd8306dc21b2afb101da26fbb93a6a22a400ecf81aebd85fce61cb8c90c9d08bdd872abf07bd2a07942b47c3e34d3addd9585f7809c0e44917ab2ba834741cb79ce98aff42de8f2f5a39c8785840220b5b09452ebf9533bde483f3bff1e128c192fd7f51b82050e8c8eb33dee3f3009e892e3f70a53326bad76ddb91a637c56d1941affc734cc68471ce7e5efb0b83c25c8a9893ec7b178b44a82b26f3ff36df8048f34ebcd69ce9003e652b7e7c217448dd7baf3b3d375b88594c1ea99b1b1e0f278fcf5a2b68cea3c0cc208c3a7e5ff7a531088bc07b81db8355870aa6e9fb0642cfb7d9173d8bcf32c0c6e2d361d8a73519c0e27e1c2585a47V3; as_dc=ucp4; as_pcts=jBLenuBb+BOcncSC7n_Q7i2vgEhlyKDC-xGE7+JDdWVZ4OmuI7A-paO7MfFiAdgUubXQ0VhdvPoDHIyH-cl1+6giv8X_Z8tFLl+hgl-gG6robDYxCxjRqM-q9FhJG_eSM3jgmqPfq3W34JR5qfWcuuQjUFPSkqHt7bHpQp0c; dssf=1; dssid2=d3a2b610-70bc-4bc3-8b89-06f40569c6d4; as_atb=1.0|MjAyNC0wNi0yNiAwNzozNTo1Mw|f08a746eb63ad6f9eaa5089ce87a39612cd3531d'
+        x_aos_stk = 'X6VBv3b56_Kp-YuFZr8QPHSfFgqei1kx6QjXSdeFtl4'
 
     # 进入购物流程
     ssi = apple_util.check_now(x_aos_stk)
-    if ssi is None :
+    if ssi is None:
         return
 
     # 绑定账号
-    if not apple_util.bind_account(x_aos_stk, ssi):
+    pltn = apple_util.bind_account(account_info, x_aos_stk, ssi)
+    if pltn is None:
         return
 
-    cookies = '; '.join(f'{key}={value}' for key, value in apple_util.cookies.items())
-    print('cookie after check now')
-    print(cookies)
+    # 开始下单
+    if not apple_util.checkout_start(pltn):
+        return
 
-    if not apple_util.create_order(x_aos_stk, data_model):
+    # 支付
+    if not apple_util.billing(x_aos_stk, data_model):
         return
 
 
