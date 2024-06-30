@@ -6,6 +6,9 @@ class DataModel:
         # 密码
         self.password = ''
 
+        # 自提店铺
+        self.store = ''
+
         # 姓
         self.first_name = ''
 
