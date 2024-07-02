@@ -1,5 +1,3 @@
-import time
-
 import requests
 import json
 import base64
@@ -9,7 +7,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from bigintutil import BigIntUtil
-from datamodel import DataModel
 import urllib.parse
 
 
@@ -86,7 +83,10 @@ class AppleUtil:
              141, 237, 17, 3, 89, 83, 46, 70, 76, 85, 246, 223, 53, 205, 156, 45, 152, 62, 176, 62, 110, 156, 128,
              116, 246, 143, 31, 241, 167, 255, 174, 126, 168, 132, 97, 238, 162, 183, 202, 11, 201, 223, 186, 59,
              190, 49, 149, 171, 145, 196, 162, 13, 122, 10, 77, 81, 47])
-        public_value = BigIntUtil.bigint_powmod(bytes([2]), private_value, magic_value)
+        private_value_bigint = int.from_bytes(private_value, 'big')
+        magic_value_bigint = int.from_bytes(magic_value, 'big')
+        public_value_bigint = BigIntUtil.bigint_powmod(2, private_value_bigint, magic_value_bigint)
+        public_value = public_value_bigint.to_bytes((public_value_bigint.bit_length() + 7) // 8, 'big')
         return [private_value, public_value]
 
     # 登录前的初始化
@@ -756,6 +756,7 @@ class AppleUtil:
         # 获取server_public_value
         server_public_value = server_public_value.encode('utf-8')
         server_public_value = base64.decodebytes(server_public_value)
+        server_public_value_bigint = int.from_bytes(server_public_value, 'big')
 
         # 使用PBKDF2算法计算秘钥
         kdf = PBKDF2HMAC(
@@ -780,7 +781,9 @@ class AppleUtil:
              152, 243, 168, 208, 195, 130, 113, 174, 53, 248, 233, 219, 251, 182, 148, 181, 200, 3, 216, 159, 122, 228,
              53, 222, 35, 109, 82, 95, 84, 117, 155, 101, 227, 114, 252, 214, 142, 242, 15, 167, 17, 31, 158, 74, 255,
              115])
+        magic_value_bigint = int.from_bytes(magic_value, 'big')
         magic_value_hash = hashlib.sha256(magic_value).digest()
+        magic_value_hash_bigint = int.from_bytes(magic_value_hash, 'big')
         magic_value_padding = bytes(
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -791,20 +794,28 @@ class AppleUtil:
              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
              0, 0, 0, 2])
         magic_value_padding_hash = hashlib.sha256(magic_value + magic_value_padding).digest()
+        magic_value_padding_hash_bigint = int.from_bytes(magic_value_padding_hash, 'big')
 
         # 冒号+key计算hash值
         key2 = hashlib.sha256(':'.encode('utf-8')+key).digest()
 
         # salt+key2计算哈希
         key3 = hashlib.sha256(salt+key2).digest()
+        key3_bigint = int.from_bytes(key3, 'big')
 
         # public value+server public value计算哈希值
         public_value_hash = hashlib.sha256(public_value+server_public_value).digest()
+        public_value_hash_bigint = int.from_bytes(public_value_hash, 'big')
 
-        bigint_l = BigIntUtil.bigint_add(BigIntUtil.bigint_multiple(public_value_hash, key3), private_value)
-        bigint_p = BigIntUtil.bigint_mod(BigIntUtil.bigint_multiple(BigIntUtil.bigint_powmod([2], key3, magic_value), magic_value_padding_hash), magic_value)
-        bigint_v = BigIntUtil.bigint_powmod(BigIntUtil.bigint_mod(BigIntUtil.bigint_subtract(server_public_value, bigint_p), magic_value), bigint_l, magic_value)
-        x = hashlib.sha256(bigint_v).digest()
+        private_value_bigint = int.from_bytes(private_value, 'big')
+        bigint_l = public_value_hash_bigint * key3_bigint + private_value_bigint
+        bigint_p = BigIntUtil.bigint_powmod(2, key3_bigint, magic_value_bigint) * magic_value_padding_hash_bigint % magic_value_bigint
+        bigint_mod = (server_public_value_bigint - bigint_p) % magic_value_bigint
+        if bigint_mod < 0:
+            bigint_mod += magic_value_bigint
+        bigint_v = BigIntUtil.bigint_powmod(bigint_mod, bigint_l, magic_value_bigint)
+        v_bytes = bigint_v.to_bytes((bigint_v.bit_length() + 7) // 8, 'big', signed=bigint_v < 0)
+        x = hashlib.sha256(v_bytes).digest()
 
         padding_bytes = bytes(
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -816,8 +827,10 @@ class AppleUtil:
              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
              0, 0, 0, 2])
         padding_hash = hashlib.sha256(padding_bytes).digest()  # s
-        bigint_h = BigIntUtil.bigint_power(magic_value_hash, padding_hash)
-        m = hashlib.sha256(bigint_h+account_hash+salt+public_value+server_public_value+x).digest()
+        padding_hash_bigint = int.from_bytes(padding_hash, 'big')
+        bigint_h = magic_value_hash_bigint ^ padding_hash_bigint
+        h_bytes = bigint_h.to_bytes((bigint_h.bit_length() + 7) // 8, 'big', signed=bigint_h < 0)
+        m = hashlib.sha256(h_bytes+account_hash+salt+public_value+server_public_value+x).digest()
         m1 = AppleUtil.btoa(m)
         m2 = AppleUtil.btoa(hashlib.sha256(public_value+m+x).digest())
 
@@ -843,230 +856,3 @@ class AppleUtil:
         # D = '02'
         # w = bigint_v
         return m1, m2
-
-
-def test_encrypt():
-    public_key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB'
-    encrypt_data = AppleUtil.encrypt(public_key, '5353079623725781'.encode('utf-8'))
-    print(encrypt_data)
-
-
-def test_login():
-    apple_util = AppleUtil()
-    # apple_util.login('ii5pfw9mvfw9i@163.com', 'Qf223322')
-    apple_util.login('suofeibuzi_992@163.com', 'Qf223322')
-
-
-def test_add_cart():
-    apple_util = AppleUtil()
-    apple_util.add_cart('iphone-15-pro', 'MU713J')
-    apple_util.open_cart()
-
-
-# 测试全流程
-def test():
-    apple_util = AppleUtil()
-
-    data_model = DataModel()
-    data_model.account = 'ii5pfw9mvfw9i@163.com'
-    data_model.password = 'Qf223322'
-    data_model.store = 'R079'
-    data_model.first_name = 'Jeric'
-    data_model.last_name = 'Ye'
-    data_model.telephone = '08054897787'
-    data_model.email = '415571971@qq.com'
-    data_model.credit_card_no = '5353076881524591'
-    data_model.expired_date = '05/26'
-    data_model.cvv = '162'
-    data_model.postal_code = '104-8125'
-    data_model.state = '北海道'
-    data_model.city = 'Fuzhou'
-    data_model.street = 'Changshan'
-    data_model.street2 = 'Zhaixianyuan'
-    data_model.giftcard_no = ''
-
-    # 添加商品
-    model = 'iphone-15-pro'
-    product = 'MTU93J'
-    if not apple_util.add_cart(model, product):
-        return
-
-    # 打开购物车
-    x_aos_stk = apple_util.open_cart()
-    if x_aos_stk is None:
-        return
-
-    # 查询是否有货
-    if not apple_util.query_product_available(data_model.postal_code, product):
-        return
-
-    # 进入购物流程
-    ssi = apple_util.checkout_now(x_aos_stk)
-    if ssi is None:
-        return
-
-    # 登录
-    if not apple_util.login(data_model.account, data_model.password):
-        return
-
-    # 绑定账号
-    pltn = apple_util.bind_account(x_aos_stk, ssi)
-    if pltn is None:
-        return
-
-    # 开始下单
-    if not apple_util.checkout_start(pltn):
-        return
-
-    # 进入下单页面
-    x_aos_stk = apple_util.checkout()
-    if x_aos_stk is None:
-        return
-
-    # 选择自提
-    if not apple_util.fulfillment_retail(x_aos_stk):
-        return
-
-    # 选择店铺
-    if not apple_util.fulfillment_store(x_aos_stk, data_model):
-        return
-
-    # 选择联系人
-    if not apple_util.pickup_contact(x_aos_stk, data_model):
-        return
-
-    # 选择使用信用卡
-    if not apple_util.billing_use_credit_card(x_aos_stk):
-        return
-
-    # 检查信用卡类型
-    if not apple_util.billing_check_credit_card_type(x_aos_stk, data_model):
-        return
-
-    # 输入信用卡信息
-    if not apple_util.billing_input_credit_card(x_aos_stk, data_model):
-        return
-
-    # 输入账单，支付
-    if not apple_util.billing_input_address(x_aos_stk, data_model):
-        return
-
-    # 确认下单
-    if not apple_util.review(x_aos_stk):
-        return
-
-    # 查询订单号
-    while True:
-        time.sleep(2)
-        order_no = apple_util.query_order_no()
-        if order_no:
-            print('query order number...')
-        else:
-            print('order number: {}'.format(order_no))
-
-
-# 测试全流程V2，优化步骤
-def test_v2():
-    apple_util = AppleUtil()
-
-    data_model = DataModel()
-    data_model.account = 'ii5pfw9mvfw9i@163.com'
-    data_model.password = 'Qf223322'
-    data_model.store = 'R079'
-    data_model.first_name = 'Jeric'
-    data_model.last_name = 'Ye'
-    data_model.telephone = '08054897787'
-    data_model.email = '415571971@qq.com'
-    data_model.credit_card_no = '5353076881524591'
-    data_model.expired_date = '05/26'
-    data_model.cvv = '162'
-    data_model.postal_code = '104-8125'
-    data_model.state = '北海道'
-    data_model.city = 'Fuzhou'
-    data_model.street = 'Changshan'
-    data_model.street2 = 'Zhaixianyuan'
-    data_model.giftcard_no = ''
-
-    # 登录
-    if not apple_util.login(data_model.account, data_model.password):
-        return
-
-    # 添加商品
-    model = 'iphone-15-pro'
-    product = 'MTU93J'
-    if not apple_util.add_cart(model, product):
-        return
-
-    # 打开购物车
-    x_aos_stk = apple_util.open_cart()
-    if x_aos_stk is None:
-        return
-
-    # 查询是否有货
-    if not apple_util.query_product_available(data_model.postal_code, product):
-        return
-
-    # 进入购物流程
-    ssi = apple_util.checkout_now(x_aos_stk)
-    if ssi is None:
-        return
-
-    # 绑定账号
-    pltn = apple_util.bind_account(x_aos_stk, ssi)
-    if pltn is None:
-        return
-
-    # 开始下单
-    if not apple_util.checkout_start(pltn):
-        return
-
-    # 进入下单页面
-    x_aos_stk = apple_util.checkout()
-    if x_aos_stk is None:
-        return
-
-    # 选择自提
-    if not apple_util.fulfillment_retail(x_aos_stk):
-        return
-
-    # 选择店铺
-    if not apple_util.fulfillment_store(x_aos_stk, data_model):
-        return
-
-    # 选择联系人
-    if not apple_util.pickup_contact(x_aos_stk, data_model):
-        return
-
-    # 输入账单，支付
-    if not apple_util.billing(x_aos_stk, data_model):
-        return
-
-    # 确认下单
-    if not apple_util.review(x_aos_stk):
-        return
-
-    # 处理订单
-    if not apple_util.query_process_result(x_aos_stk):
-        return
-
-    # 查询订单号
-    while True:
-        time.sleep(2)
-        order_no = apple_util.query_order_no()
-        if order_no:
-            print('order number: {}'.format(order_no))
-            break
-        else:
-            print('query order number...')
-
-
-if __name__ == '__main__':
-    # test_encrypt()
-    # test_login()
-    # test_add_cart()
-    # test_query_product_available()
-    # test_login_and_addcart()
-    # test_order()
-    # test()
-    test_v2()
-    print('done')
