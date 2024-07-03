@@ -47,3 +47,7 @@ QXLSX_HEADERPATH=../QXlsx/header/  # current QXlsx header path is ./header/
 QXLSX_SOURCEPATH=../QXlsx/source/  # current QXlsx source path is ./source/
 include(../QXlsx/QXlsx.pri)
 INCLUDEPATH += QXLSX_HEADERPATH
+
+# curl
+INCLUDEPATH += ../curl/include
+LIBS += -L"$$_PRO_FILE_PWD_/../curl/lib" -llibcurl
