@@ -1,7 +1,10 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QListWidget>
+#include "datamodel.h"
+#include "planitemwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -14,6 +17,30 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+private:
+    void initCtrls();
+
+    void addPlanListItemCtrl(const PlanItem& plan);
+
+    void updatePlanListItemCtrl(QString planId);
+
+    QListWidgetItem* getPlanListItem(QString planId);
+
+private slots:
+    void onImportUserInfoBtn();
+
+    void onAddPlanBtn();
+
+    void onEditPlanBtn(QString planId);
+
+    void onDeletePlanBtn(QString planId);
+
+    void onRunPlanBtn(QString planId);
+
+    void onStopPlanBtn(QString planId);
+
+    void addLog(QString log);
 
 private:
     Ui::MainWindow *ui;

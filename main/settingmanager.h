@@ -2,18 +2,31 @@
 
 #include <QString>
 #include <QVector>
+#include "datamodel.h"
 
-class CSettingManager
+class SettingManager
 {
 protected:
-	CSettingManager();
+    SettingManager();
 
 public:
-	static CSettingManager* GetInstance();
+    static SettingManager* getInstance();
+
+public:
+    PhoneModel* getPhoneModelByCode(QString code);
 
 private:
-	void Load();
+    void load();
 
 public:
-    int m_nLogLevel = 2;  // info level
+    int m_logLevel = 2;  // info level
+
+    // 网络请求间隔秒数
+    int m_networkRequestInterval = 2;
+
+    // 店铺列表
+    QVector<ShopItem> m_shops;
+
+    // 机型列表
+    QVector<PhoneModel> m_phoneModels;
 };

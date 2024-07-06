@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     CDumpUtil::Enable(true);
 
     // 设置日志级别
-    int nLogLevel = CSettingManager::GetInstance()->m_nLogLevel;
+    int nLogLevel = SettingManager::getInstance()->m_logLevel;
     g_dllLog->SetLogLevel((ELogLevel)nLogLevel);
     originalHandler = qInstallMessageHandler(logToFile);
 

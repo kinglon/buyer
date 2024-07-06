@@ -15,9 +15,15 @@ SOURCES += \
     Utility/ImPath.cpp \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
+    datamodel.cpp \
     main.cpp \
     mainwindow.cpp \
-    settingmanager.cpp
+    multiselectiondialog.cpp \
+    plandialog.cpp \
+    planitemwidget.cpp \
+    planmanager.cpp \
+    settingmanager.cpp \
+    uiutil.cpp
 
 HEADERS += \
     Utility/DumpUtil.h \
@@ -27,11 +33,20 @@ HEADERS += \
     Utility/LogBuffer.h \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
+    datamodel.h \
     mainwindow.h \
-    settingmanager.h
+    multiselectiondialog.h \
+    plandialog.h \
+    planitemwidget.h \
+    planmanager.h \
+    settingmanager.h \
+    uiutil.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    multiselectiondialog.ui \
+    plandialog.ui \
+    planitemwidget.ui
 
 # Enable PDB generation
 QMAKE_CFLAGS_RELEASE += /Zi

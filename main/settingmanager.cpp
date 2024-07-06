@@ -7,18 +7,31 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
-CSettingManager::CSettingManager()
+SettingManager::SettingManager()
 {
-    Load();
+    load();
 }
 
-CSettingManager* CSettingManager::GetInstance()
+SettingManager* SettingManager::getInstance()
 {
-	static CSettingManager* pInstance = new CSettingManager();
+    static SettingManager* pInstance = new SettingManager();
 	return pInstance;
 }
 
-void CSettingManager::Load()
+PhoneModel* SettingManager::getPhoneModelByCode(QString code)
+{
+    for (auto& phoneModel : m_phoneModels)
+    {
+        if (phoneModel.m_code == code)
+        {
+            return &phoneModel;
+        }
+    }
+
+    return nullptr;
+}
+
+void SettingManager::load()
 {
     std::wstring strConfFilePath = CImPath::GetConfPath() + L"configs.json";    
     QFile file(QString::fromStdWString(strConfFilePath));
@@ -32,5 +45,28 @@ void CSettingManager::Load()
 
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
     QJsonObject root = jsonDocument.object();
-    m_nLogLevel = root["log_level"].toInt();
+
+    m_logLevel = root["log_level"].toInt();
+    m_networkRequestInterval = root["network_request_interval"].toInt();
+
+    QJsonArray shops = root["shop"].toArray();
+    for (auto shop : shops)
+    {
+        QJsonObject shopJson = shop.toObject();
+        ShopItem shopItem;
+        shopItem.m_name = shopJson["name"].toString();
+        shopItem.m_postalCode = shopJson["postal"].toString();
+        m_shops.append(shopItem);
+    }
+
+    QJsonArray phoneModels = root["phone_model"].toArray();
+    for (auto phoneModel : phoneModels)
+    {
+        QJsonObject phoneModelJson = phoneModel.toObject();
+        PhoneModel phoneModelItem;
+        phoneModelItem.m_code = phoneModelJson["code"].toString();
+        phoneModelItem.m_model = phoneModelJson["model"].toString();
+        phoneModelItem.m_name = phoneModelJson["name"].toString();
+        m_phoneModels.append(phoneModelItem);
+    }
 }
