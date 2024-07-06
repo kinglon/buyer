@@ -18,6 +18,8 @@ public:
 
     void deletePlan(QString id);
 
+    void setPlanStatus(QString id, int status);
+
 private:
     void load();
 

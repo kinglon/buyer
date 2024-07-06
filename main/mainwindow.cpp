@@ -4,6 +4,7 @@
 #include "planmanager.h"
 #include "planitemwidget.h"
 #include <QDateTime>
+#include "planrunner.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -130,26 +131,52 @@ void MainWindow::onDeletePlanBtn(QString planId)
 
 void MainWindow::onRunPlanBtn(QString planId)
 {
-    PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
-    if (plan == nullptr)
+    PlanRunner* planRunner = m_planRunners[planId];
+    if (planRunner)
     {
+        qCritical("the plan has been running");
         return;
     }
 
-    plan->m_status = PLAN_STATUS_ADD_CART;
-    updatePlanListItemCtrl(planId);
+    planRunner = new PlanRunner(planId, this);
+    connect(planRunner, &PlanRunner::log, this, &MainWindow::addLog);
+    connect(planRunner, &PlanRunner::planStatusChange, [this] (QString planId) {
+        updatePlanListItemCtrl(planId);
+    });
+    connect(planRunner, &PlanRunner::runFinish, [this] (QString planId) {
+        PlanManager::getInstance()->setPlanStatus(planId, PLAN_STATUS_TO_ADD_CART);
+        updatePlanListItemCtrl(planId);
+        PlanRunner* planRunner = m_planRunners[planId];
+        m_planRunners[planId] = nullptr;
+        if (planRunner)
+        {
+            planRunner->deleteLater();
+        }
+    });
+
+    if (planRunner->start())
+    {
+        m_planRunners[planId] = planRunner;
+    }
+    else
+    {
+        planRunner->deleteLater();
+    }
 }
 
 void MainWindow::onStopPlanBtn(QString planId)
 {
-    PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
-    if (plan == nullptr)
+    PlanRunner* planRunner = m_planRunners[planId];
+    if (planRunner == nullptr)
     {
+        qCritical("the plan has not been running");
         return;
     }
 
-    plan->m_status = PLAN_STATUS_STOPPING;
+    PlanManager::getInstance()->setPlanStatus(planId, PLAN_STATUS_STOPPING);
     updatePlanListItemCtrl(planId);
+
+    planRunner->stop();
 }
 
 void MainWindow::addLog(QString log)

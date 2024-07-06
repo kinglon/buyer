@@ -16,12 +16,16 @@ SOURCES += \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
     datamodel.cpp \
+    goodsavailabilitychecker.cpp \
+    goodsbuyer.cpp \
+    httpthread.cpp \
     main.cpp \
     mainwindow.cpp \
     multiselectiondialog.cpp \
     plandialog.cpp \
     planitemwidget.cpp \
     planmanager.cpp \
+    planrunner.cpp \
     settingmanager.cpp \
     uiutil.cpp
 
@@ -34,11 +38,15 @@ HEADERS += \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
     datamodel.h \
+    goodsavailabilitychecker.h \
+    goodsbuyer.h \
+    httpthread.h \
     mainwindow.h \
     multiselectiondialog.h \
     plandialog.h \
     planitemwidget.h \
     planmanager.h \
+    planrunner.h \
     settingmanager.h \
     uiutil.h
 

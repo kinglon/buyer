@@ -3,8 +3,10 @@
 
 #include <QMainWindow>
 #include <QListWidget>
+#include <QMap>
 #include "datamodel.h"
 #include "planitemwidget.h"
+#include "planrunner.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -44,5 +46,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+
+    QMap<QString, PlanRunner*> m_planRunners;
 };
 #endif // MAINWINDOW_H

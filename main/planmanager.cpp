@@ -118,3 +118,15 @@ void PlanManager::deletePlan(QString id)
 
     save();
 }
+
+void PlanManager::setPlanStatus(QString id, int status)
+{
+    for (auto it = m_plans.begin(); it != m_plans.end(); it++)
+    {
+        if (it->m_id == id)
+        {
+            it->m_status = status;
+            break;
+        }
+    }
+}
