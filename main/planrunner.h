@@ -48,7 +48,7 @@ private slots:
     void printLog(const QString& content);
 
     // 有货
-    void onGoodsCheckFinish(bool exist);
+    void onGoodsCheckFinish(QVector<ShopItem> shops);
 
     // 购买完成
     void onGoodsBuyFinish(GoodsBuyer* buyer);
@@ -63,6 +63,9 @@ private:
     GoodsAvailabilityChecker* m_goodsChecker = nullptr;
 
     QVector<GoodsBuyer*> m_goodsBuyers;
+
+    // 有货的商店
+    QVector<ShopItem> m_shops;
 };
 
 #endif // PLANRUNNER_H

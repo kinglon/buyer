@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QTimer>
 #include "Utility/ImPath.h"
+#include "settingmanager.h"
 
 PlanRunner::PlanRunner(QString planId, QObject *parent)
     : QObject{parent},
@@ -141,14 +142,36 @@ void PlanRunner::queryAddCartRunnerStatus()
 
 void PlanRunner::launchGoodsChecker()
 {
+    PlanItem* plan = PlanManager::getInstance()->getPlanById(m_planId);
+    if (plan == nullptr)
+    {
+        return;
+    }
+
     m_goodsChecker = new GoodsAvailabilityChecker();
+    m_goodsChecker->setPhoneCode(plan->m_phoneCode);
+
+    QVector<ShopItem> queryShops;
+    for (const auto& shopId : plan->m_buyingShops)
+    {
+        for (const auto& shop : SettingManager::getInstance()->m_shops)
+        {
+            if (shop.m_name == shopId)
+            {
+                queryShops.append(shop);
+                break;
+            }
+        }
+    }
+    m_goodsChecker->setShops(queryShops);
+
     connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
     connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
     connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
     m_goodsChecker->start();
 }
 
-void PlanRunner::onGoodsCheckFinish(bool exist)
+void PlanRunner::onGoodsCheckFinish(QVector<ShopItem> shops)
 {
     m_goodsChecker = nullptr;
     if (m_requestStop)
@@ -156,11 +179,13 @@ void PlanRunner::onGoodsCheckFinish(bool exist)
         emit runFinish(m_planId);
     }
 
-    if (exist)
+    if (!shops.empty())
     {
         emit printLog(QString::fromWCharArray(L"查询到有货"));
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_BUYING);
         emit planStatusChange(m_planId);
+
+        m_shops = shops;
         launchGoodsBuyer();
     }
     else

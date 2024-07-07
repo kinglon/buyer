@@ -74,3 +74,11 @@ INCLUDEPATH += QXLSX_HEADERPATH
 # curl
 INCLUDEPATH += ../curl/include
 LIBS += -L"$$_PRO_FILE_PWD_/../curl/lib" -llibcurl
+
+# Cryptopp
+INCLUDEPATH += ../Cryptopp/include
+CONFIG(debug, debug|release) {
+    LIBS += -L"$$_PRO_FILE_PWD_/../Cryptopp/lib/Debug" -lcryptlib
+} else {
+    LIBS += -L"$$_PRO_FILE_PWD_/../Cryptopp/lib/Release" -lcryptlib
+}

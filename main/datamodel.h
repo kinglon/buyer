@@ -76,6 +76,9 @@ public:
 
     // 店铺邮编
     QString m_postalCode;
+
+    // 店铺ID
+    QString m_storeNumber;
 };
 
 class PlanItem

@@ -1,102 +1,94 @@
 ﻿#include "httpthread.h"
 
-typedef struct {
-  char *buf;
-  size_t size;
-} memory;
-
-size_t grow_buffer(void *contents, size_t sz, size_t nmemb, void *ctx)
+size_t writeCallback(void *contents, size_t sz, size_t nmemb, std::string *body)
 {
-  size_t realsize = sz * nmemb;
-  memory *mem = (memory*) ctx;
-  char *ptr = (char*)realloc(mem->buf, mem->size + realsize);
-  if(!ptr) {
-      qCritical("not enough memory");
-      return 0;
-  }
-  mem->buf = ptr;
-  memcpy(&(mem->buf[mem->size]), contents, realsize);
-  mem->size += realsize;
-  return realsize;
+    size_t realsize = sz * nmemb;
+    body->append((char*)contents, realsize);
+    return realsize;
+}
+
+size_t headerCallback(char* data, size_t size, size_t nmemb, std::string* headers)
+{
+    size_t dataSize = size * nmemb;
+    headers->append(data, dataSize);
+    return dataSize;
 }
 
 HttpThread::HttpThread(QObject *parent)
     : QThread{parent}
 {
-
+    curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 
-void HttpThread::run()
+CURL* HttpThread::makeRequest(QString url,
+                              const QMap<QString,QString>& headers,
+                              const QMap<QString,QString>& cookies,
+                              ProxyServer proxyServer)
 {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    m_multiHandle = curl_multi_init();
-    if (m_multiHandle == nullptr)
+    CURL *handle = curl_easy_init();
+    if (handle == nullptr)
     {
-        qCritical("failed to create multi handle");
-        return;
+        return nullptr;
     }
 
-    onRun();
+    curl_easy_setopt(handle, CURLOPT_URL, url.toStdString().c_str());
 
-    curl_multi_cleanup(m_multiHandle);
-}
+    std::string* body = new std::string();
+    body->reserve(500*1024);
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, body);
+    m_bodies[handle] = body;
 
+    std::string* headerBuffer = new std::string();
+    headerBuffer->reserve(50*1024);
+    curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, headerCallback);
+    curl_easy_setopt(handle, CURLOPT_HEADERDATA, headerBuffer);
+    m_responseHeaders[handle] = headerBuffer;
 
-CURL* HttpThread::makeRequest(QString url, const QMap<QString,QString>& cookies, ProxyServer proxyServer)
-{
-  CURL *handle = curl_easy_init();
-  if (handle == nullptr)
-  {
-      return nullptr;
-  }
+    if (!proxyServer.m_ip.isEmpty())
+    {
+        QString proxyServerHead = QString("socks5://%1:%2").arg(proxyServer.m_ip, proxyServer.m_port);
+        curl_easy_setopt(handle, CURLOPT_PROXY, proxyServerHead.toStdString().c_str());
+    }
 
-  curl_easy_setopt(handle, CURLOPT_URL, url.toStdString().c_str());
-
-  /* buffer body */
-  memory *mem = (memory*)malloc(sizeof(memory));
-  mem->size = 0;
-  mem->buf = (char*)malloc(1);
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, grow_buffer);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, mem);
-  m_writeDataBuffers[handle] = mem;
-
-  curl_easy_setopt(handle, CURLOPT_TIMEOUT, getTimeOutSeconds());
-  curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, getTimeOutSeconds());
-  curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-  curl_easy_setopt(handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
-
-  curl_easy_setopt(handle, CURLOPT_HEADER, "Content-Type: application/json");
-  curl_easy_setopt(handle, CURLOPT_HEADER, "Accept: application/json, text/plain, */*");
-  curl_easy_setopt(handle, CURLOPT_HEADER, "Accept-Encoding: gzip, deflate, br, zstd");
-  curl_easy_setopt(handle, CURLOPT_HEADER, "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8");
-  curl_easy_setopt(handle, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
-
-  if (!proxyServer.m_ip.isEmpty())
-  {
-      QString proxyServerHead = QString("socks5://%1:%2").arg(proxyServer.m_ip, proxyServer.m_port);
-      curl_easy_setopt(handle, CURLOPT_PROXY, proxyServerHead.toStdString().c_str());
-  }
-
-  if (!cookies.empty())
-  {
-      QString cookieHead;
-      for (auto it = cookies.begin(); it != cookies.end(); it++)
-      {
+    if (!cookies.empty())
+    {
+        QString cookieHead;
+        for (auto it = cookies.begin(); it != cookies.end(); it++)
+        {
           if (!cookieHead.isEmpty())
           {
               cookieHead += "; ";
           }
           cookieHead += it.key() + "=" + it.value();
-      }
-      curl_easy_setopt(handle, CURLOPT_COOKIE, cookieHead.toStdString().c_str());
-  }
+        }
+        curl_easy_setopt(handle, CURLOPT_COOKIE, cookieHead.toStdString().c_str());
+    }
 
-  for (const auto& header : getHeaders())
-  {
-      curl_easy_setopt(handle, CURLOPT_HEADER, header.toStdString().c_str());
-  }
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT, getTimeOutSeconds());
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, getTimeOutSeconds());
+    curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+    curl_easy_setopt(handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+    curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br, zstd");
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
 
-  return handle;
+    struct curl_slist* curlHeaders = nullptr;
+    curlHeaders = curl_slist_append(curlHeaders, "Content-Type: application/json");
+    curlHeaders = curl_slist_append(curlHeaders, "Accept: application/json, text/plain, */*");
+    curlHeaders = curl_slist_append(curlHeaders, "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8");
+    for (const auto& header : getCommonHeaders())
+    {
+        curlHeaders = curl_slist_append(curlHeaders, header.toStdString().c_str());
+    }
+    for (auto it = headers.begin(); it != headers.end(); it++)
+    {
+        QString h = it.key() + ": " + it.value();
+        curlHeaders = curl_slist_append(curlHeaders, h.toStdString().c_str());
+    }
+    curl_easy_setopt(handle, CURLOPT_HTTPHEADER, curlHeaders);
+    m_requestHeaders[handle] = curlHeaders;
+
+    return handle;
 }
 
 void HttpThread::setPostMethod(CURL* curl, const QString& body)
@@ -109,25 +101,83 @@ void HttpThread::getResponse(CURL* curl, long& statusCode, QString& data)
 {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
 
-    auto it = m_writeDataBuffers.find(curl);
-    if (it != m_writeDataBuffers.end())
-    {
-        memory* mem = (memory*)it.value();
-        data = QString::fromUtf8(mem->buf, mem->size);
+    auto it = m_bodies.find(curl);
+    if (it != m_bodies.end())
+    {        
+        data = QString::fromUtf8((*it)->c_str(), (*it)->length());
     }
 }
 
-void HttpThread::freeRequest(CURL* curl)
+QMap<QString, QString> HttpThread::getCookies(CURL* curl)
 {
-    memory *mem = nullptr;
-    auto it = m_writeDataBuffers.find(curl);
-    if (it != m_writeDataBuffers.end())
+    QMap<QString, QString> cookies;
+    auto it = m_responseHeaders.find(curl);
+    if (it == m_responseHeaders.end())
     {
-        mem = (memory*)it.value();
-        m_writeDataBuffers.erase(it);
+        return cookies;
     }
-    free(mem->buf);
-    free(mem);
+
+    std::string& headers = *it.value();
+    size_t pos = headers.find("Set-Cookie:");
+    while (pos != std::string::npos)
+    {
+        pos += sizeof("Set-Cookie:");
+        size_t end = headers.find("\r\n", pos);
+        if (end != std::string::npos)
+        {
+            std::string setCookieHeader = headers.substr(pos, end - pos);
+
+            // Parse the key and value of the cookie
+            size_t equalsPos = setCookieHeader.find('=');
+            if (equalsPos != std::string::npos)
+            {
+                std::string key = setCookieHeader.substr(0, equalsPos);
+                std::string value = setCookieHeader.substr(equalsPos + 1);
+
+                // Remove leading and trailing spaces from the key and value
+                size_t keyStart = key.find_first_not_of(" \t");
+                size_t keyEnd = key.find_last_not_of(" \t");
+                size_t valueStart = value.find_first_not_of(" \t");
+                size_t valueEnd = value.find_last_not_of(" \t");
+
+                if (keyStart != std::string::npos && keyEnd != std::string::npos && valueStart != std::string::npos && valueEnd != std::string::npos)
+                {
+                    key = key.substr(keyStart, keyEnd - keyStart + 1);
+                    value = value.substr(valueStart, valueEnd - valueStart + 1);
+                    cookies[key.c_str()] = value.c_str();
+                }
+            }
+        }
+
+        // Find the next occurrence of "Set-Cookie:"
+        pos = headers.find("Set-Cookie:", pos);
+    }
+
+    return cookies;
+}
+
+void HttpThread::freeRequest(CURL* curl)
+{    
+    auto itBody = m_bodies.find(curl);
+    if (itBody != m_bodies.end())
+    {
+        delete (*itBody);
+        m_bodies.erase(itBody);
+    }
+
+    auto itRequestHeader = m_requestHeaders.find(curl);
+    if (itRequestHeader != m_requestHeaders.end())
+    {
+        curl_slist_free_all(*itRequestHeader);
+        m_requestHeaders.erase(itRequestHeader);
+    }
+
+    auto itResponseHeader = m_responseHeaders.find(curl);
+    if (itResponseHeader != m_responseHeaders.end())
+    {
+        delete (*itResponseHeader);
+        m_responseHeaders.erase(itResponseHeader);
+    }
 
     curl_easy_cleanup(curl);
 }

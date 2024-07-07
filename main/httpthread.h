@@ -23,28 +23,30 @@ public:
     explicit HttpThread(QObject *parent = nullptr);
 
 protected:
-    virtual void onRun() = 0;
-
     virtual int getTimeOutSeconds() { return 3; }
 
-    virtual QVector<QString> getHeaders() { return QVector<QString>(); }
+    virtual QVector<QString> getCommonHeaders() { return QVector<QString>(); }
 
-    CURL* makeRequest(QString url, const QMap<QString,QString>& cookies, ProxyServer proxyServer);
+    CURL* makeRequest(QString url,
+                      const QMap<QString,QString>& headers,
+                      const QMap<QString,QString>& cookies,
+                      ProxyServer proxyServer);
 
     void setPostMethod(CURL* curl, const QString& body);
 
     void getResponse(CURL* curl, long& statusCode, QString& data);
 
+    // 获取服务端的Set-Cookies
+    QMap<QString, QString> getCookies(CURL* curl);
+
     void freeRequest(CURL* curl);
 
 private:
-    void run() override;
+    QMap<CURL*, std::string*> m_bodies;
 
-protected:
-    CURLM* m_multiHandle = nullptr;
+    QMap<CURL*, struct curl_slist*> m_requestHeaders;
 
-private:
-    QMap<CURL*, void*> m_writeDataBuffers;
+    QMap<CURL*, std::string*> m_responseHeaders;
 };
 
 #endif // HTTPTHREAD_H
