@@ -152,7 +152,7 @@ void PlanDialog::onOkBtn()
     m_planItem.m_count = count;
 
     int threadCount = ui->threadCountEdit->text().toInt();
-    if (threadCount < 0)
+    if (threadCount <= 0)
     {
         UiUtil::showTip(QString::fromWCharArray(L"线程数未填写"));
         return;

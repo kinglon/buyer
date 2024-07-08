@@ -4,7 +4,10 @@
 #include "planmanager.h"
 #include "planitemwidget.h"
 #include <QDateTime>
+#include <QFileDialog>
 #include "planrunner.h"
+#include "userinfomanager.h"
+#include "uiutil.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -84,7 +87,32 @@ QListWidgetItem* MainWindow::getPlanListItem(QString planId)
 
 void MainWindow::onImportUserInfoBtn()
 {
-    // todo by yejinlong, onImportUserInfoBtn
+    // Create a QFileDialog object
+    QFileDialog fileDialog;
+
+    // Set the dialog's title
+    fileDialog.setWindowTitle(QString::fromWCharArray(L"选择表格文件"));
+
+    // Set the dialog's filters
+    fileDialog.setNameFilters(QStringList() << "Excel files (*.xlsx *.xls)");
+
+    // Open the dialog and get the selected files
+    if (fileDialog.exec() == QDialog::Accepted)
+    {
+        QStringList selectedFiles = fileDialog.selectedFiles();
+        if (selectedFiles.size() > 0)
+        {
+            if (!UserInfoManager::getInstance()->importUserInfo(selectedFiles[0]))
+            {
+                UiUtil::showTip(QString::fromWCharArray(L"加载用户资料失败"));
+            }
+            else
+            {
+                int count = UserInfoManager::getInstance()->m_users.size();
+                addLog(QString::fromWCharArray(L"加载用户资料成功，共%d条").arg(count));
+            }
+        }
+    }
 }
 
 void MainWindow::onAddPlanBtn()

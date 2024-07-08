@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -27,7 +27,8 @@ SOURCES += \
     planmanager.cpp \
     planrunner.cpp \
     settingmanager.cpp \
-    uiutil.cpp
+    uiutil.cpp \
+    userinfomanager.cpp
 
 HEADERS += \
     Utility/DumpUtil.h \
@@ -48,7 +49,8 @@ HEADERS += \
     planmanager.h \
     planrunner.h \
     settingmanager.h \
-    uiutil.h
+    uiutil.h \
+    userinfomanager.h
 
 FORMS += \
     mainwindow.ui \
@@ -65,11 +67,8 @@ QMAKE_LFLAGS_RELEASE += /DEBUG
 DEFINES += QT_MESSAGELOGCONTEXT
 
 # QXlsx code for Application Qt project
-QXLSX_PARENTPATH=../QXlsx         # current QXlsx path is . (. means curret directory)
-QXLSX_HEADERPATH=../QXlsx/header/  # current QXlsx header path is ./header/
-QXLSX_SOURCEPATH=../QXlsx/source/  # current QXlsx source path is ./source/
 include(../QXlsx/QXlsx.pri)
-INCLUDEPATH += QXLSX_HEADERPATH
+INCLUDEPATH += ../QXlsx/header/
 
 # curl
 INCLUDEPATH += ../curl/include

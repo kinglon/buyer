@@ -25,9 +25,6 @@ public:
     // 密码
     QString m_password;
 
-    // 自提店铺
-    QString m_store;
-
     // 姓
     QString m_firstName;
 

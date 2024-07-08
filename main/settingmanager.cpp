@@ -59,13 +59,13 @@ void SettingManager::load()
         m_shops.append(shopItem);
     }
 
-    QJsonArray phoneModels = root["phone_model"].toArray();
-    for (auto phoneModel : phoneModels)
-    {
-        QJsonObject phoneModelJson = phoneModel.toObject();
+    QJsonObject phoneModels = root["phone_model"].toObject();
+    for (auto phoneModel : phoneModels.keys())
+    {        
+        QJsonObject phoneModelJson = phoneModels[phoneModel].toObject();
         PhoneModel phoneModelItem;
-        phoneModelItem.m_code = phoneModelJson["code"].toString();
-        phoneModelItem.m_model = phoneModelJson["model"].toString();
+        phoneModelItem.m_model = phoneModel;
+        phoneModelItem.m_code = phoneModelJson["code"].toString();        
         phoneModelItem.m_name = phoneModelJson["name"].toString();
         m_phoneModels.append(phoneModelItem);
     }

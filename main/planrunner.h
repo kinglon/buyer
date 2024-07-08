@@ -28,6 +28,9 @@ signals:
     void runFinish(QString planId);
 
 private:
+    // 获取本地IP列表
+    QVector<QString> getLocalIps();
+
     // 启动python程序上货
     bool launchAddCartRunner(PlanItem* plan);
 
@@ -40,6 +43,9 @@ private:
     // 启动购买器
     void launchGoodsBuyer();
 
+    // 保存购买结果
+    bool saveBuyingResult(const QVector<BuyResult>& buyResults);
+
     // 流程结束
     void finishPlan();
 
@@ -51,7 +57,7 @@ private slots:
     void onGoodsCheckFinish(QVector<ShopItem> shops);
 
     // 购买完成
-    void onGoodsBuyFinish(GoodsBuyer* buyer);
+    void onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult> buyResults);
 
 private:
     QString m_planId;
@@ -64,8 +70,14 @@ private:
 
     QVector<GoodsBuyer*> m_goodsBuyers;
 
-    // 有货的商店
-    QVector<ShopItem> m_shops;
+    // 本地IP列表
+    QVector<QString> m_localIps;
+
+    // 购买参数列表
+    QVector<BuyParam> m_buyParams;
+
+    // 购买结果列表
+    QVector<BuyResult> m_buyResults;
 };
 
 #endif // PLANRUNNER_H

@@ -4,6 +4,10 @@
 #include <filters.h>
 #include <osrng.h>
 #include <QUrl>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QUrlQuery>
 
 #define APPLE_HOST "https://www.apple.com/jp"
 #define APPSTORE_HOST "https://secure6.store.apple.com/jp"
@@ -16,8 +20,8 @@ GoodsBuyer::GoodsBuyer(QObject *parent)
 
 void GoodsBuyer::run()
 {
-    CURLM* multiHandle = curl_multi_init();
-    if (multiHandle == nullptr)
+    m_multiHandle = curl_multi_init();
+    if (m_multiHandle == nullptr)
     {
         qCritical("failed to init a multi handle");
         emit buyFinish(this, QVector<BuyResult>());
@@ -30,8 +34,8 @@ void GoodsBuyer::run()
         BuyUserData* userData = new BuyUserData();
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
         userData->m_buyResult.m_currentStep = STEP_CHECKOUT_NOW;
-        userData->m_buyParam = m_buyParams[i];
-        userData->m_localIp = m_localIps[i%m_localIps.size()];
+        userData->m_buyResult.m_localIp = m_localIps[i%m_localIps.size()];
+        userData->m_buyParam = m_buyParams[i];        
         userData->m_stepBeginTime = beginTime;
 
         CURL* curl = makeBuyingRequest(userData);
@@ -39,13 +43,13 @@ void GoodsBuyer::run()
         {
             break;
         }
-        curl_multi_add_handle(multiHandle, curl);
+        curl_multi_add_handle(m_multiHandle, curl);
     }
 
     while (!m_requestStop)
     {        
         int msgs_left = 0;
-        CURLMsg *m = curl_multi_info_read(multiHandle, &msgs_left);
+        CURLMsg *m = curl_multi_info_read(m_multiHandle, &msgs_left);
         if (m == nullptr)
         {
             continue;
@@ -66,7 +70,7 @@ void GoodsBuyer::run()
             }
         }
 
-        curl_multi_remove_handle(multiHandle, m->easy_handle);
+        curl_multi_remove_handle(m_multiHandle, m->easy_handle);
         freeRequest(m->easy_handle);
 
         if (m_buyResults.size() == m_buyParams.size())
@@ -76,7 +80,7 @@ void GoodsBuyer::run()
     }
 
     // 释放所有请求
-    CURL **list = curl_multi_get_handles(multiHandle);
+    CURL **list = curl_multi_get_handles(m_multiHandle);
     if (list)
     {
         for (int i = 0; list[i]; i++)
@@ -88,12 +92,12 @@ void GoodsBuyer::run()
                 m_buyResults.append(userData->m_buyResult);
                 delete userData;
             }
-            curl_multi_remove_handle(multiHandle, list[i]);
+            curl_multi_remove_handle(m_multiHandle, list[i]);
             freeRequest(list[i]);
         }
         curl_free(list);
     }
-    curl_multi_cleanup(multiHandle);
+    curl_multi_cleanup(m_multiHandle);
 
     emit buyFinish(this, m_buyResults);
 }
@@ -287,7 +291,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
 
     QString xAosStkHeader = "X-Aos-Stk: " + userData->m_buyParam.m_xAosStk;
     curl_easy_setopt(curl, CURLOPT_HEADER, xAosStkHeader.toStdString().c_str());
-    curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_localIp.toStdString().c_str());
+    curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyResult.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
     return curl;
 }
@@ -310,6 +314,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
     QString responseData;
     getResponse(curl, statusCode, responseData);
 
+    // 网络请求报错，流程结束
     if (!(statusCode >= 200 && statusCode < 400))
     {
         m_buyResults.append(userData->m_buyResult);
@@ -317,16 +322,182 @@ void GoodsBuyer::handleResponse(CURL* curl)
         return;
     }
 
+    // 更新cookies
     QMap<QString, QString> cookies = getCookies(curl);
     for (auto it=cookies.begin(); it!=cookies.end(); it++)
     {
         userData->m_buyParam.m_cookies[it.key()] = it.value();
     }
 
+    bool canNextStep = false;
     if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_NOW)
     {
+        canNextStep = handleCheckNowResponse(userData, responseData);
+        if (canNextStep)
+        {
+            userData->m_buyResult.m_currentStep = STEP_BIND_ACCOUNT;
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_BIND_ACCOUNT)
+    {
+        userData->m_buyParam.m_cookies.remove("myacinfo");
+        canNextStep = handleBindAccountResponse(userData, responseData);
+        if (canNextStep)
+        {
+            userData->m_buyResult.m_currentStep = STEP_CHECKOUT_START;
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_START)
+    {
+        userData->m_buyResult.m_currentStep = STEP_CHECKOUT;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT)
+    {
+        canNextStep = handleCheckoutResponse(userData, responseData);
+        if (canNextStep)
+        {
+            userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_RETAIL;
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_RETAIL)
+    {
+        userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
+    {
+        userData->m_buyResult.m_currentStep = STEP_PICKUP_CONTACT;
 
     }
+    else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
+    {
+        userData->m_buyResult.m_currentStep = STEP_BILLING;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_BILLING)
+    {
+        userData->m_buyResult.m_currentStep = STEP_REVIEW;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
+    {
+        userData->m_buyResult.m_currentStep = STEP_PROCESS;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
+    {
+        userData->m_buyResult.m_currentStep = STEP_QUERY_ORDER_NO;
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
+    {
+        handleQueryOrderResponse(userData, responseData);
+        canNextStep = false;  // 不管有没有获取到订单号，都结束流程
+    }
+
+    if (canNextStep)
+    {
+        CURL* nextCurl = makeBuyingRequest(userData);
+        if (nextCurl)
+        {
+            curl_multi_add_handle(m_multiHandle, nextCurl);
+        }
+    }
+    else
+    {
+        m_buyResults.append(userData->m_buyResult);
+        delete userData;
+    }
+}
+
+bool GoodsBuyer::handleCheckNowResponse(BuyUserData* userData, QString& responseData)
+{
+    QByteArray jsonData = responseData.toUtf8();
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        qCritical("failed to parse json, data is %s", responseData.toStdString().c_str());
+        return false;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    if (root.contains("head") && root["head"].toObject().contains("data") &&
+            root["head"].toObject()["data"].toObject().contains("url"))
+    {
+        QString url = root["head"].toObject()["data"].toObject()["url"].toString();
+        QUrlQuery urlQuery(url);
+        QString ssi = urlQuery.queryItemValue("ssi");
+        if (!ssi.isEmpty())
+        {
+            userData->m_ssi = ssi;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GoodsBuyer::handleBindAccountResponse(BuyUserData* userData, QString& responseData)
+{
+    QByteArray jsonData = responseData.toUtf8();
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        qCritical("failed to parse json, data is %s", responseData.toStdString().c_str());
+        return false;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    if (root.contains("head") && root["head"].toObject().contains("data") &&
+            root["head"].toObject()["data"].toObject().contains("args") &&
+            root["head"].toObject()["data"].toObject()["args"].toObject().contains("pltn"))
+    {
+        QString pltn = root["head"].toObject()["data"].toObject()["args"].toObject()["pltn"].toString();
+        if (!pltn.isEmpty())
+        {
+            userData->m_pltn = pltn;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GoodsBuyer::handleCheckoutResponse(BuyUserData* userData, QString& responseData)
+{
+    int begin = responseData.indexOf("x-aos-stk\":");
+    if (begin >= 0)
+    {
+        begin = responseData.indexOf('"', begin + strlen("x-aos-stk\":"));
+        if (begin > 0)
+        {
+            int end = responseData.indexOf('"', begin + 1);
+            QString xAosStk = responseData.mid(begin + 1, end - begin -1);
+            if (!xAosStk.isEmpty())
+            {
+                userData->m_buyParam.m_xAosStk = xAosStk;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool GoodsBuyer::handleQueryOrderResponse(BuyUserData* userData, QString& data)
+{
+    int begin = data.indexOf("\"orderNumber\":");
+    if (begin > 0)
+    {
+        begin = data.indexOf('"', begin + strlen("\"orderNumber\":"));
+        if (begin > 0)
+        {
+            int end = data.indexOf('"', begin + 1);
+            QString orderNumber = data.mid(begin + 1, end - begin -1);
+            if (!orderNumber.isEmpty())
+            {
+                userData->m_buyResult.m_orderNo = orderNumber;
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QString& cardNoCipher)

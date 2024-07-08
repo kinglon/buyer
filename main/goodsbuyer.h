@@ -49,6 +49,62 @@ public:
 
     // 每个步骤的耗时，毫秒数
     QVector<int> m_takeTimes;
+
+    // 发送IP地址
+    QString m_localIp;
+
+public:
+    QString getStepName() const
+    {
+        if (m_currentStep == STEP_CHECKOUT_NOW)
+        {
+            return QString::fromWCharArray(L"前往购买");
+        }
+        else if (m_currentStep == STEP_BIND_ACCOUNT)
+        {
+            return QString::fromWCharArray(L"绑定账号");
+        }
+        else if (m_currentStep == STEP_CHECKOUT_START)
+        {
+            return QString::fromWCharArray(L"开始购买1");
+        }
+        else if (m_currentStep == STEP_CHECKOUT)
+        {
+            return QString::fromWCharArray(L"开始购买2");
+        }
+        else if (m_currentStep == STEP_FULFILLMENT_RETAIL)
+        {
+            return QString::fromWCharArray(L"选择自提");
+        }
+        else if (m_currentStep == STEP_FULFILLMENT_STORE)
+        {
+            return QString::fromWCharArray(L"选择店铺");
+        }
+        else if (m_currentStep == STEP_PICKUP_CONTACT)
+        {
+            return QString::fromWCharArray(L"选择联系人");
+        }
+        else if (m_currentStep == STEP_BILLING)
+        {
+            return QString::fromWCharArray(L"支付");
+        }
+        else if (m_currentStep == STEP_REVIEW)
+        {
+            return QString::fromWCharArray(L"确认订单");
+        }
+        else if (m_currentStep == STEP_PROCESS)
+        {
+            return QString::fromWCharArray(L"处理订单");
+        }
+        else if (m_currentStep == STEP_QUERY_ORDER_NO)
+        {
+            return QString::fromWCharArray(L"查询订单号");
+        }
+        else
+        {
+            return "";
+        }
+    }
 };
 
 class BuyUserData
@@ -58,10 +114,7 @@ public:
     BuyParam m_buyParam;
 
     // 结果
-    BuyResult m_buyResult;
-
-    // 发送IP地址
-    QString m_localIp;
+    BuyResult m_buyResult;    
 
     // 步骤开始时间，GetTickCount64返回的秒数
     int64_t m_stepBeginTime = 0;
@@ -104,10 +157,20 @@ private:
 
     void handleResponse(CURL* curl);
 
+    bool handleCheckNowResponse(BuyUserData* userData, QString& responseData);
+
+    bool handleBindAccountResponse(BuyUserData* userData, QString& responseData);
+
+    bool handleCheckoutResponse(BuyUserData* userData, QString& responseData);
+
+    bool handleQueryOrderResponse(BuyUserData* userData, QString& responseData);
+
     void getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QString& cardNoCipher);
 
 private:
     bool m_requestStop = false;
+
+    CURLM* m_multiHandle = nullptr;
 
     // 本地IP列表
     QVector<QString> m_localIps;
