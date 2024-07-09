@@ -20,9 +20,6 @@ public:
     // 模拟有货
     void mockFinish() { m_mockFinish = true; }
 
-    // 设置代理IP所属的国家
-    void setProxyRegion(QString region) { m_proxyRegion = region; }
-
     // 设置查询店铺列表
     void setShops(const QVector<ShopItem>& shops) { m_shops = shops; }
 
@@ -56,8 +53,6 @@ private:
     bool m_requestStop = false;
 
     bool m_mockFinish = false;
-
-    QString m_proxyRegion = "jp";
 
     // 最大请求数
     int m_maxReqCount = 300;

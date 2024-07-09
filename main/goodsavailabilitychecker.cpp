@@ -2,6 +2,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include "settingmanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
 
@@ -16,7 +17,7 @@ void GoodsAvailabilityChecker::getProxyServer(QVector<ProxyServer>& proxyServers
     int retryCount = 3;
     for (int i=0; i<retryCount && !m_requestStop; i++)
     {
-        QString url = QString("http://api.proxy.ipidea.io/getBalanceProxyIp?num=900&return_type=json&lb=1&sb=0&flow=1&regions=%1&protocol=socks5").arg(m_proxyRegion);
+        QString url = QString("http://api.proxy.ipidea.io/getBalanceProxyIp?num=900&return_type=json&lb=1&sb=0&flow=1&regions=%1&protocol=socks5").arg(SettingManager::getInstance()->m_proxyRegion);
         CURL* curl = makeRequest(url, QMap<QString,QString>(), QMap<QString,QString>(), ProxyServer());
         if (curl == nullptr)
         {
@@ -195,7 +196,12 @@ CURL* GoodsAvailabilityChecker::makeQueryRequest(QString postal)
     }
 
     QString url = APPLE_HOST + QString("/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0=%1/A&location=%2").arg(m_phoneCode, postal);
-    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), m_proxyServers[m_nextProxyIndex]);
+    ProxyServer proxyServer;
+    if (SettingManager::getInstance()->m_useProxy)
+    {
+        proxyServer = m_proxyServers[m_nextProxyIndex];
+    }
+    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);
     m_nextProxyIndex = (m_nextProxyIndex + 1) % m_proxyServers.size();
     m_reqCount += 1;
     m_lastSendReqTimeMs = GetTickCount64();

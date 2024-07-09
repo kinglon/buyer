@@ -31,6 +31,9 @@ private:
     // 获取本地IP列表
     QVector<QString> getLocalIps();
 
+    // 创建上货Python程序的参数文件
+    bool createAddCardRunnerParamFile(PlanItem* plan, QString paramFilePath);
+
     // 启动python程序上货
     bool launchAddCartRunner(PlanItem* plan);
 

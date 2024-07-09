@@ -20,6 +20,7 @@
 #include "xlsxrichstring.h"
 #include "xlsxworkbook.h"
 #include <QDesktopServices>
+#include <QDir>
 
 using namespace QXlsx;
 
@@ -102,15 +103,84 @@ QVector<QString> PlanRunner::getLocalIps()
     return ipAddresses;
 }
 
+bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFilePath)
+{
+    QJsonObject root;
+    root["use_proxy"] = SettingManager::getInstance()->m_useProxy;
+    root["proxy_region"] = SettingManager::getInstance()->m_proxyRegion;
+
+    PhoneModel* phoneModel = SettingManager::getInstance()->getPhoneModelByCode(plan->m_phoneCode);
+    if (phoneModel == nullptr)
+    {
+        return false;
+    }
+
+    QJsonObject phoneModelJson;
+    phoneModelJson["model"] = phoneModel->m_model;
+    phoneModelJson["phone_code"] = phoneModel->m_code;
+    root["phone_model"] = phoneModelJson;
+
+    // 计算分配的用户范围
+    int begin = 0;
+    for (const auto& planItem : PlanManager::getInstance()->m_plans)
+    {
+        if (planItem.m_id != plan->m_id)
+        {
+            begin += planItem.m_count;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (begin + plan->m_count > UserInfoManager::getInstance()->m_users.length())
+    {
+        printLog(QString::fromWCharArray(L"用户资料不够"));
+        return false;
+    }
+
+    QJsonArray usersJson;
+    for (int i=0; i<plan->m_count; i++)
+    {
+        QJsonObject userJson;
+        userJson["account"] = UserInfoManager::getInstance()->m_users[begin+i].m_accountName;
+        userJson["password"] = UserInfoManager::getInstance()->m_users[begin+i].m_password;
+        usersJson.append(userJson);
+    }
+    root["user"] = usersJson;
+
+    QJsonDocument jsonDocument(root);
+    QByteArray jsonData = jsonDocument.toJson(QJsonDocument::Indented);
+    QFile file(paramFilePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        qCritical("failed to save the param json file");
+        return false;
+    }
+    file.write(jsonData);
+    file.close();
+
+    return true;
+}
+
 bool PlanRunner::launchAddCartRunner(PlanItem* plan)
 {
-    // todo by yejinlong, 创建python_args.json文件
+    // 重建计划数据目录
+    QString argsFolderPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
+    QDir folderDir(argsFolderPath);
+    if (folderDir.exists())
+    {
+        folderDir.removeRecursively();
+    }
+    CreateDirectory(argsFolderPath.toStdWString().c_str(), nullptr);
 
-    // 获取参数文件的路径
-    QDateTime dateTime = QDateTime::currentDateTime();
-    QString currentTime = dateTime.toString(QString::fromWCharArray(L"yyyyMMdd_hhmm"));
-    QString argsFolderName = plan->m_name + "_" + currentTime;
-    std::wstring argsFolderPath = CImPath::GetDataPath() + argsFolderName.toStdWString();
+    // 创建参数文件
+    QString argsFilePath = argsFolderPath + "\\python_args.json";
+    if (!createAddCardRunnerParamFile(plan, argsFilePath))
+    {
+        return false;
+    }
 
     // 启动python程序
     SECURITY_ATTRIBUTES sa;
@@ -128,7 +198,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
 
     std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"addcart.py";
     wchar_t command[MAX_PATH];
-    _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), argsFolderPath.c_str());
+    _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), argsFolderPath.toStdWString().c_str());
     if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
     {
         qCritical("failed to create python process, error is %d", GetLastError());

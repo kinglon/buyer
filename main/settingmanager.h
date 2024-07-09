@@ -21,6 +21,10 @@ private:
 public:
     int m_logLevel = 2;  // info level
 
+    bool m_useProxy = true;
+
+    QString m_proxyRegion = "jp";
+
     // 网络请求间隔秒数
     int m_networkRequestInterval = 2;
 

@@ -47,6 +47,8 @@ void SettingManager::load()
     QJsonObject root = jsonDocument.object();
 
     m_logLevel = root["log_level"].toInt();
+    m_useProxy = root["use_proxy"].toBool();
+    m_proxyRegion = root["proxy_region"].toString();
     m_networkRequestInterval = root["network_request_interval"].toInt();
 
     QJsonArray shops = root["shop"].toArray();
