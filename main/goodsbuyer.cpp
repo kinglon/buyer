@@ -325,7 +325,13 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
 
     curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyResult.m_localIp.toStdString().c_str());
-    curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
+    curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);    
+
+    if (SettingManager::getInstance()->m_enableDebug)
+    {
+        qInfo("begin to send request %d", userData->m_buyResult.m_currentStep);
+    }
+
     return curl;
 }
 
@@ -336,6 +342,11 @@ void GoodsBuyer::handleResponse(CURL* curl)
     if (userData == nullptr)
     {
         return;
+    }
+
+    if (SettingManager::getInstance()->m_enableDebug)
+    {
+        qInfo("receive the response of request %d", userData->m_buyResult.m_currentStep);
     }
 
     int64_t now = GetTickCount64();
