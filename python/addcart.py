@@ -8,7 +8,7 @@ import json
 
 # 输出结果
 g_success = False
-g_message = '未知错误'
+g_message = ''
 g_buy_params = []
 
 no_proxy_server = {"http": "", "https": ""}
@@ -56,6 +56,8 @@ def load_params(param_file_path):
 
 
 def save(success, message, buy_params, save_file_path):
+    if not success and len(message) == 0:
+        message = "未知错误"
     root = {'success': success, 'message': message, 'buy_param': buy_params}
     with open(save_file_path, "w", encoding='utf-8') as file:
         json.dump(root, file, indent=4)
@@ -74,10 +76,13 @@ def add_cart(work_path):
         return
 
     # 获取代理IP列表
+    print('begin to get proxy server list')
     proxy_server_list = get_proxy_server_list(proxy_region)
     if len(proxy_server_list) == 0:
-        g_message = '获取代理IP失败'
+        if len(g_message) == 0:
+            g_message = '获取代理IP失败'
         return
+    print('finish to get proxy server list')
 
     for i in range(len(users)):
         account = users[i]['account']
@@ -90,7 +95,8 @@ def add_cart(work_path):
             # 设置代理IP
             if use_proxy:
                 proxy_server = proxy_server_list[i % len(proxy_server_list)]
-                proxy = "socks5://{}:{}".format(proxy_server['ip'], proxy_server['port'])
+                proxy_address = "socks5://{}:{}".format(proxy_server['ip'], proxy_server['port'])
+                proxy = {"http": proxy_address, "https": proxy_address}
             else:
                 proxy = no_proxy_server
             apple_util.proxies = proxy
@@ -133,13 +139,15 @@ def main():
     LogUtil.set_log_path(work_path)
     LogUtil.enable()
 
+    print('begin')
     try:
         add_cart(work_path)
     except Exception as e:
         print("has an error: {}".format(e))
         traceback.print_exc()
-    save(g_success, g_message, g_buy_params, os.path.join(work_path, 'add_cart_result.json'))
+    save(g_success, g_message, g_buy_params, os.path.join(work_path, 'add_cart_result.json'))    
+    print('done')
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     main()

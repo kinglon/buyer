@@ -115,7 +115,7 @@ QString GoodsBuyer::getBodyString(const QMap<QString, QString>& body)
     QString bodyStr;
     for (auto it=body.begin(); it!=body.end(); it++)
     {
-        if (bodyStr.isEmpty())
+        if (!bodyStr.isEmpty())
         {
             bodyStr += "&";
         }
@@ -129,16 +129,16 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     QMap<QString, QString> headers;
     headers["origin"] = APPLE_HOST;
     headers["Referer"] = APPLE_HOST;
-    headers["Content-Type"] = "application/x-www-form-urlencoded";
     headers["Syntax"] = "graviton";
     headers["Modelversion"] = "v2";
-    headers["X-Requested-With"] = "Fetch";
-    headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
 
     CURL* curl = nullptr;
     if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_NOW)
     {
         QString url = QString(APPLE_HOST) + "/shop/bagx/checkout_now?_a=checkout&_m=shoppingCart.actions";
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "cart";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
@@ -149,6 +149,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_BIND_ACCOUNT)
     {
         QString url = APPSTORE_HOST + QString("/shop/signIn/idms/authx?ssi=%1&up=true").arg(userData->m_ssi);
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "signInPage";
         userData->m_buyParam.m_cookies["as_dc"] = "ucp3";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -160,6 +163,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_START)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkout/start");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
@@ -169,13 +173,15 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkout");
-        headers.remove("X-Aos-Stk");
+        QString url = APPSTORE_HOST + QString("/shop/checkout");        
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
     }
     else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_RETAIL)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx/fulfillment?_a=selectFulfillmentLocationAction&_m=checkout.fulfillment.fulfillmentOptions");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Fulfillment-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -187,6 +193,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Fulfillment-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -200,6 +209,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=continueFromPickupContactToBilling&_m=checkout.pickupContact");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=PickupContact-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -220,6 +232,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_BILLING)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Billing-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -256,6 +271,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx/review?_a=continueFromReviewToProcess&_m=checkout.review.placeOrder");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Review";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -267,6 +285,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=pollingProcess&_m=spinner");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -278,6 +299,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=pollingProcess&_m=spinner");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
@@ -289,6 +313,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkout/thankyou");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
     }
@@ -333,7 +358,14 @@ void GoodsBuyer::handleResponse(CURL* curl)
     QMap<QString, QString> cookies = getCookies(curl);
     for (auto it=cookies.begin(); it!=cookies.end(); it++)
     {
-        userData->m_buyParam.m_cookies[it.key()] = it.value();
+        if (it.value() == "DELETED")
+        {
+            userData->m_buyParam.m_cookies.remove(it.key());
+        }
+        else
+        {
+            userData->m_buyParam.m_cookies[it.key()] = it.value();
+        }
     }
 
     bool canNextStep = true;
@@ -520,9 +552,9 @@ void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QS
 
     QString publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB";
     QByteArray publicKeyBytes = QByteArray::fromBase64(publicKey.toUtf8());
-    CryptoPP::StringSource publicKeySource(publicKeyBytes.data(), publicKeyBytes.length());
+    CryptoPP::ArraySource publicKeySource((const byte*)publicKeyBytes.data(), publicKeyBytes.length(), true);
     CryptoPP::RSA::PublicKey rsaPublicKey;
-    rsaPublicKey.BERDecode(publicKeySource);
+    rsaPublicKey.Load(publicKeySource);
 
     CryptoPP::AutoSeededRandomPool rng;
     CryptoPP::RSAES< CryptoPP::OAEP<CryptoPP::SHA256> >::Encryptor encryptor(rsaPublicKey);
@@ -532,7 +564,8 @@ void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QS
             new CryptoPP::StringSink(ciphertext)
         )
     );
-
+    QByteArray base64ByteArray = QByteArray(ciphertext.c_str(), ciphertext.length()).toBase64();
+    QString base64CipherText = QString::fromUtf8(base64ByteArray);
     cardNoCipher = QString("{\"cipherText\":\"%1\",\"publicKeyHash\":\"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=\"}")
-            .arg(ciphertext.c_str());
+            .arg(base64CipherText);
 }

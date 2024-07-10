@@ -28,6 +28,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::initCtrls()
 {
+    ui->planList->setItemDelegate(new MyItemDelegate(ui->planList));
     for (const auto& plan : PlanManager::getInstance()->m_plans)
     {
         addPlanListItemCtrl(plan);

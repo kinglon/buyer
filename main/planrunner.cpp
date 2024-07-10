@@ -43,7 +43,7 @@ bool PlanRunner::start()
     // 重建计划数据目录
     m_planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
     QDir folderDir(m_planDataPath);
-    if (folderDir.exists() && !SettingManager::getInstance()->m_enableDebug)
+    if (folderDir.exists())
     {
         if (!folderDir.removeRecursively())
         {
@@ -189,34 +189,30 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
     }
 
     // 启动python程序，如果调试就跳过这个步骤
-    HANDLE processHandle = NULL;
-    if (!SettingManager::getInstance()->m_enableDebug)
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE;
+    sa.lpSecurityDescriptor = NULL;
+
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;;
+    si.wShowWindow = SW_HIDE;
+
+    std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"python\\addcart.py";
+    wchar_t command[MAX_PATH];
+    _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), m_planDataPath.toStdWString().c_str());
+    if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
     {
-        SECURITY_ATTRIBUTES sa;
-        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-        sa.bInheritHandle = TRUE;
-        sa.lpSecurityDescriptor = NULL;
-
-        STARTUPINFO si;
-        PROCESS_INFORMATION pi;
-        ZeroMemory(&si, sizeof(si));
-        ZeroMemory(&pi, sizeof(pi));
-        si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESHOWWINDOW;;
-        si.wShowWindow = SW_HIDE;
-
-        std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"python\\addcart.py";
-        wchar_t command[MAX_PATH];
-        _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), m_planDataPath.toStdWString().c_str());
-        if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
-        {
-            qCritical("failed to create python process, error is %d", GetLastError());
-            return false;
-        }
-
-        CloseHandle(pi.hThread);
-        processHandle = pi.hProcess;
+        qCritical("failed to create python process, error is %d", GetLastError());
+        return false;
     }
+
+    CloseHandle(pi.hThread);
+    HANDLE processHandle = pi.hProcess;
 
     // 定时检查Python进程状态
     QTimer* timer = new QTimer(this);
@@ -463,22 +459,19 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
     for (const auto& buyResult : buyResults)
     {
         xlsx.write(row, 1, buyResult.m_account);
-        xlsx.write(row, 2, buyResult.m_orderNo);
-        if (buyResult.m_orderNo.isEmpty())
+        xlsx.write(row, 2, buyResult.m_orderNo);        
+        xlsx.write(row, 3, buyResult.getStepName());
+        QString takeTimes;
+        for (const auto& takeTime : buyResult.m_takeTimes)
         {
-            xlsx.write(row, 3, buyResult.getStepName());
-            QString takeTimes;
-            for (const auto& takeTime : buyResult.m_takeTimes)
+            if (!takeTimes.isEmpty())
             {
-                if (!takeTimes.isEmpty())
-                {
-                    takeTimes += ",";
-                }
-                takeTimes += QString::number(takeTime);
+                takeTimes += ",";
             }
-            xlsx.write(row, 4, takeTimes);
-            xlsx.write(row, 5, buyResult.m_localIp);
+            takeTimes += QString::number(takeTime);
         }
+        xlsx.write(row, 4, takeTimes);
+        xlsx.write(row, 5, buyResult.m_localIp);
         row++;
     }
 
