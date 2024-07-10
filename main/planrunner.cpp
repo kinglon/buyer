@@ -223,6 +223,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         {
             timer->stop();
             timer->deleteLater();
+            TerminateProcess(processHandle, 1);
             CloseHandle(processHandle);
             emit runFinish(m_planId);
             return;
@@ -232,6 +233,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         DWORD exitCode = 0;
         if (GetExitCodeProcess(processHandle, &exitCode) && exitCode == STILL_ACTIVE)
         {
+            printLog(QString::fromWCharArray(L"加货中"));
             return;
         }
 

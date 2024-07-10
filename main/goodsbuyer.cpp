@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QUrlQuery>
+#include "settingmanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
 #define APPSTORE_HOST "https://secure6.store.apple.com/jp"
@@ -426,6 +427,12 @@ void GoodsBuyer::handleResponse(CURL* curl)
     {
         handleQueryOrderResponse(userData, responseData);
         canNextStep = false;  // 不管有没有获取到订单号，都结束流程
+    }
+
+    // 开发调试使用
+    if (userData->m_buyResult.m_currentStep >= SettingManager::getInstance()->m_stopStep)
+    {
+        canNextStep = false;
     }
 
     if (canNextStep)

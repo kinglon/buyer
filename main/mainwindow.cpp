@@ -210,6 +210,14 @@ void MainWindow::onStopPlanBtn(QString planId)
 
 void MainWindow::addLog(QString log)
 {
+    static int lineCount = 0;
+    if (lineCount >= 1000)
+    {
+        ui->logEdit->clear();
+        lineCount = 0;
+    }
+    lineCount++;
+
     qInfo(log.toStdString().c_str());
     QDateTime currentDateTime = QDateTime::currentDateTime();
     QString currentTimeString = currentDateTime.toString("[MM-dd hh:mm:ss] ");

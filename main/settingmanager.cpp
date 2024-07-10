@@ -51,6 +51,7 @@ void SettingManager::load()
     m_enableDebug = root["enable_debug"].toBool();
     m_proxyRegion = root["proxy_region"].toString();
     m_queryGoodInterval = root["query_good_interval"].toInt();
+    m_stopStep = root["stop_step"].toInt();
 
     QJsonArray shops = root["shop"].toArray();
     for (auto shop : shops)

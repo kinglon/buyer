@@ -66,6 +66,11 @@ void GoodsAvailabilityChecker::parseProxyServerData(const QString& data, QVector
     if (!root.contains("success") || !root["success"].toBool() || !root.contains("data"))
     {
         qCritical("the proxy server report error, data is %s", data.toStdString().c_str());
+        if (root.contains("msg"))
+        {
+            QString msg = root["msg"].toString();
+            emit printLog(msg.toStdString().c_str());
+        }
         return;
     }
 
@@ -99,6 +104,8 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
         }
         curl_multi_add_handle(multiHandle, curl);
     }
+
+    int64_t lastReportLogTime = GetTickCount64();
 
     QVector<ShopItem> availShops;
     while (!m_requestStop)
@@ -174,6 +181,12 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
                 curl_multi_add_handle(multiHandle, curl);
             }
         }
+
+        if (GetTickCount64() - lastReportLogTime >= 5000)
+        {
+            emit printLog(QString::fromWCharArray(L"店铺没货"));
+            lastReportLogTime = GetTickCount64();
+        }
     }
 
     // 释放所有请求
@@ -210,9 +223,10 @@ CURL* GoodsAvailabilityChecker::makeQueryRequest(QString postal)
     if (SettingManager::getInstance()->m_useProxy)
     {
         proxyServer = m_proxyServers[m_nextProxyIndex];
+        m_nextProxyIndex = (m_nextProxyIndex + 1) % m_proxyServers.size();
     }
-    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);
-    m_nextProxyIndex = (m_nextProxyIndex + 1) % m_proxyServers.size();
+
+    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);    
     m_reqCount += 1;
     m_lastSendReqTimeMs = GetTickCount64();
     return request;
@@ -290,15 +304,18 @@ void GoodsAvailabilityChecker::run()
     m_maxReqCount = getTimeOutSeconds() * 1000 / m_reqIntervalMs;
 
     // 获取代理IP池
-    QVector<ProxyServer> proxyServers;
-    getProxyServer(proxyServers);
-    if (proxyServers.empty())
+    if (SettingManager::getInstance()->m_useProxy)
     {
-        emit printLog(QString::fromWCharArray(L"获取代理IP池失败"));
-        emit checkFinish(nullptr);
-        return;
+        QVector<ProxyServer> proxyServers;
+        getProxyServer(proxyServers);
+        if (proxyServers.empty())
+        {
+            emit printLog(QString::fromWCharArray(L"获取代理IP池失败"));
+            emit checkFinish(nullptr);
+            return;
+        }
+        m_proxyServers = proxyServers;
     }
-    m_proxyServers = proxyServers;
 
     // 查询是否有货
     QVector<ShopItem> shops = queryIfGoodsAvailable();

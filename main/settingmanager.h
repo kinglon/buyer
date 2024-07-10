@@ -30,6 +30,9 @@ public:
     // 查询是否有货间隔，毫秒
     int m_queryGoodInterval = 100;
 
+    // 停止步骤，开发调试使用
+    int m_stopStep = 100;
+
     // 店铺列表
     QVector<ShopItem> m_shops;
 

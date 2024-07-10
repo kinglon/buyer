@@ -28,7 +28,7 @@ def get_proxy_server_list(proxy_region):
                 return data['data']
             else:
                 global g_message
-                g_message = data['msg']
+                g_message = '获取代理IP列表失败，' + data['msg']
                 return []
     except requests.exceptions.RequestException as e:
         print("failed to get proxy ips, error is {}".format(e))
@@ -76,20 +76,21 @@ def add_cart(work_path):
         return
 
     # 获取代理IP列表
-    print('begin to get proxy server list')
-    proxy_server_list = get_proxy_server_list(proxy_region)
-    if len(proxy_server_list) == 0:
-        if len(g_message) == 0:
-            g_message = '获取代理IP失败'
-        return
-    print('finish to get proxy server list')
+    if use_proxy:
+        print('begin to get proxy server list')
+        proxy_server_list = get_proxy_server_list(proxy_region)
+        if len(proxy_server_list) == 0:
+            if len(g_message) == 0:
+                g_message = '获取代理IP失败'
+            return
+        print('finish to get proxy server list')
 
     for i in range(len(users)):
         account = users[i]['account']
         password = users[i]['password']
 
         ok = False
-        for j in range(2):
+        for j in range(3):
             apple_util = AppleUtil()
 
             # 设置代理IP
@@ -102,20 +103,26 @@ def add_cart(work_path):
             apple_util.proxies = proxy
 
             # 登录
+            print('begin to login')
             if not apple_util.login(account, password):
                 g_message = '登录失败，用户名({})，密码({})'.format(account, password)
                 continue
+            print('end to login')
 
             # 添加商品
+            print('begin to add goods')
             if not apple_util.add_cart(phone_model['model'], phone_model['phone_code']):
                 g_message = '加货失败，机型: {}, {}'.format(phone_model['model'], phone_model['phone_code'])
                 continue
+            print('end to add goods')
 
             # 打开购物车
+            print('begin to open cart')
             x_aos_stk = apple_util.open_cart()
             if x_aos_stk is None:
                 g_message = '加货失败，打开购物袋失败'
                 continue
+            print('end to open cart')
 
             ok = True
             buy_param = {

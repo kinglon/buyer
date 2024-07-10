@@ -18,6 +18,7 @@ class AppleUtil:
         self.proxies = {"http": "", "https": ""}
         self.cookies = {}
         self.debug_cookie = ''
+        self.timeout = 10
 
     # 保存响应内容，调试使用
     @staticmethod
@@ -110,7 +111,7 @@ class AppleUtil:
                     "protocols": ["s2k"]
                     }
             body = json.dumps(body)
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to do auth init, error is {}".format(response))
                 return None
@@ -141,7 +142,7 @@ class AppleUtil:
                     "rememberMe": False
                     }
             body = json.dumps(body)
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to do auth complete, error is {}".format(response))
                 return False
@@ -182,7 +183,7 @@ class AppleUtil:
             # 获取atb token
             url = self.apple_host + '/shop/beacon/atb'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to update cookies when adding cart, error is {}".format(response))
                 return False
@@ -200,7 +201,7 @@ class AppleUtil:
             url = (self.apple_host + '/shop/buy-iphone/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
                    .format(model, product, atbtoken))
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, allow_redirects=False, proxies=self.proxies)
+            response = requests.get(url, headers=headers, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to add cart, error is {}".format(response))
                 return False
@@ -223,7 +224,7 @@ class AppleUtil:
             url = (self.apple_host + '/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0={}/A&location={}'
                    .format(product, location))
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to query product available, error is {}".format(response))
                 return False
@@ -245,7 +246,7 @@ class AppleUtil:
         try:
             url = self.apple_host + '/shop/bag'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to open cart, error is {}".format(response))
                 return None
@@ -279,7 +280,7 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'cart'
             body = 'shoppingCart.recommendations.recommendedItem.part=&shoppingCart.bagSavedItems.part=&shoppingCart.bagSavedItems.listId=&shoppingCart.bagSavedItems.childPart=&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.isIntentToGift=false&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.itemQuantity.quantity=1&shoppingCart.locationConsent.locationConsent=false&shoppingCart.summary.promoCode.promoCode=&shoppingCart.actions.fcscounter=&shoppingCart.actions.fcsdata='
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to check now, error is {}".format(response))
                 return None
@@ -312,7 +313,7 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'signInPage'
             body = 'deviceID=TF1%3B015%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3BMozilla%3BNetscape%3B5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3B20030107%3Bundefined%3Btrue%3B%3Btrue%3BWin32%3Bundefined%3BMozilla%2F5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3Bzh-CN%3Bundefined%3Bsecure6.store.apple.com%3Bundefined%3Bundefined%3Bundefined%3Bundefined%3Bfalse%3Bfalse%3B1719370448096%3B8%3B2005%2F6%2F7%252021%253A33%253A44%3B1366%3B768%3B%3B%3B%3B%3B%3B%3B%3B-480%3B-480%3B2024%2F6%2F26%252010%253A54%253A08%3B24%3B1366%3B728%3B0%3B0%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B25%3B&grantCode='
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to bind account, error is {}".format(response))
                 return None
@@ -334,7 +335,7 @@ class AppleUtil:
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             body = 'pltn={}'.format(pltn)
-            response = requests.post(url, headers=headers, data=body, allow_redirects=False, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to checkout start, error is {}".format(response))
                 return False
@@ -351,7 +352,7 @@ class AppleUtil:
         try:
             url = self.appstore_host + '/shop/checkout'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to checkout, error is {}".format(response))
                 return None
@@ -382,7 +383,7 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
             body = 'checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL'
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to fulfillment retail, error is {}".format(response))
                 return False
@@ -405,7 +406,7 @@ class AppleUtil:
             headers['X-Aos-Model-Page'] = 'checkoutPage'
             body = ('checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL&checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore={}&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput={}'
                     .format(data_model.store, data_model.postal_code))
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to fulfillment, error is {}".format(response))
                 return False
@@ -438,7 +439,7 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to pickup contact, error is {}".format(response))
                 return False
@@ -469,7 +470,7 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to bill for usging credit card, error is {}".format(response))
                 return False
@@ -507,7 +508,7 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to bill of checking credit card, error is {}".format(response))
                 return False
@@ -545,7 +546,7 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to bill of inputting credit card, error is {}".format(response))
                 return False
@@ -587,7 +588,7 @@ class AppleUtil:
             }
             body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}' for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to billing, error is {}".format(response))
                 return False
@@ -639,7 +640,7 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies)
+            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to billing, error is {}".format(response))
                 return False
@@ -660,7 +661,7 @@ class AppleUtil:
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
-            response = requests.post(url, headers=headers, proxies=self.proxies)
+            response = requests.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to review, error is {}".format(response))
                 return False
@@ -681,7 +682,7 @@ class AppleUtil:
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
-            response = requests.post(url, headers=headers, proxies=self.proxies)
+            response = requests.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to query process result, error is {}".format(response))
                 return False
@@ -699,7 +700,7 @@ class AppleUtil:
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Process'
-            response = requests.get(url, headers=headers, proxies=self.proxies)
+            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not response.ok:
                 print("failed to query order number, error is {}".format(response))
                 return None
@@ -834,8 +835,8 @@ class AppleUtil:
         m1 = AppleUtil.btoa(m)
         m2 = AppleUtil.btoa(hashlib.sha256(public_value+m+x).digest())
 
-        print('M1: {}'.format(m1))
-        print('M2: {}'.format(m2))
+        # print('M1: {}'.format(m1))
+        # print('M2: {}'.format(m2))
 
         # e = iteration
         # l = e

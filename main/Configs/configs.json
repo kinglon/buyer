@@ -4,6 +4,7 @@
     "use_proxy": true,
     "proxy_region": "jp",
     "query_good_interval": 100,
+    "stop_step": 100,
     "network_request_interval": 2,
     "shop": [
         {
