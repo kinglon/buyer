@@ -48,8 +48,9 @@ void SettingManager::load()
 
     m_logLevel = root["log_level"].toInt();
     m_useProxy = root["use_proxy"].toBool();
+    m_enableDebug = root["enable_debug"].toBool();
     m_proxyRegion = root["proxy_region"].toString();
-    m_networkRequestInterval = root["network_request_interval"].toInt();
+    m_queryGoodInterval = root["query_good_interval"].toInt();
 
     QJsonArray shops = root["shop"].toArray();
     for (auto shop : shops)
@@ -62,13 +63,16 @@ void SettingManager::load()
     }
 
     QJsonObject phoneModels = root["phone_model"].toObject();
-    for (auto phoneModel : phoneModels.keys())
+    for (const auto& phoneModel : phoneModels.keys())
     {        
-        QJsonObject phoneModelJson = phoneModels[phoneModel].toObject();
-        PhoneModel phoneModelItem;
-        phoneModelItem.m_model = phoneModel;
-        phoneModelItem.m_code = phoneModelJson["code"].toString();        
-        phoneModelItem.m_name = phoneModelJson["name"].toString();
-        m_phoneModels.append(phoneModelItem);
+        QJsonArray phoneModelJsonArray = phoneModels[phoneModel].toArray();
+        for (const auto& phoneModelJson : phoneModelJsonArray)
+        {
+            PhoneModel phoneModelItem;
+            phoneModelItem.m_model = phoneModel;
+            phoneModelItem.m_code = phoneModelJson.toObject()["code"].toString();
+            phoneModelItem.m_name = phoneModelJson.toObject()["name"].toString();
+            m_phoneModels.append(phoneModelItem);
+        }
     }
 }

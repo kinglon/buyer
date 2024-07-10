@@ -29,7 +29,7 @@ public:
 protected:
     void run() override;
 
-    QVector<QString> getCommonHeaders() override;
+    QMap<QString,QString> getCommonHeaders() override;
 
 private:
     void getProxyServer(QVector<ProxyServer>& proxyServers);
@@ -45,7 +45,7 @@ private:
 
 signals:
     // 有货的店铺
-    void checkFinish(QVector<ShopItem> shops);
+    void checkFinish(QVector<ShopItem>* shops);
 
     void printLog(QString content);
 
@@ -55,7 +55,7 @@ private:
     bool m_mockFinish = false;
 
     // 最大请求数
-    int m_maxReqCount = 300;
+    int m_maxReqCount = 30;
 
     // 使用的请求数
     int m_reqCount = 0;

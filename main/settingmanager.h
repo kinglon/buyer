@@ -23,10 +23,12 @@ public:
 
     bool m_useProxy = true;
 
+    bool m_enableDebug = false;
+
     QString m_proxyRegion = "jp";
 
-    // 网络请求间隔秒数
-    int m_networkRequestInterval = 2;
+    // 查询是否有货间隔，毫秒
+    int m_queryGoodInterval = 100;
 
     // 店铺列表
     QVector<ShopItem> m_shops;

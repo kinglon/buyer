@@ -109,7 +109,7 @@ void MainWindow::onImportUserInfoBtn()
             else
             {
                 int count = UserInfoManager::getInstance()->m_users.size();
-                addLog(QString::fromWCharArray(L"加载用户资料成功，共%d条").arg(count));
+                addLog(QString::fromWCharArray(L"加载用户资料成功，共%1条").arg(count));
             }
         }
     }

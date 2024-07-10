@@ -1,7 +1,9 @@
 {   
     "log_level":2,
+    "enable_debug": false,
     "use_proxy": true,
     "proxy_region": "jp",
+    "query_good_interval": 100,
     "network_request_interval": 2,
     "shop": [
         {

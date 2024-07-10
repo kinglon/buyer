@@ -24,7 +24,7 @@ void GoodsBuyer::run()
     if (m_multiHandle == nullptr)
     {
         qCritical("failed to init a multi handle");
-        emit buyFinish(this, QVector<BuyResult>());
+        emit buyFinish(this, nullptr);
     }
 
     // 初始化每个购买流程
@@ -48,6 +48,14 @@ void GoodsBuyer::run()
 
     while (!m_requestStop)
     {        
+        int stillRunning = 0;
+        CURLMcode mc = curl_multi_perform(m_multiHandle, &stillRunning);
+        if (mc)
+        {
+            qCritical("curl_multi_perform return error: %d", mc);
+            break;
+        }
+
         int msgs_left = 0;
         CURLMsg *m = curl_multi_info_read(m_multiHandle, &msgs_left);
         if (m == nullptr)
@@ -55,7 +63,7 @@ void GoodsBuyer::run()
             continue;
         }
 
-        if (m->msg != CURLMSG_DONE && m->data.result == CURLE_OK)
+        if (m->msg == CURLMSG_DONE && m->data.result == CURLE_OK)
         {
             handleResponse(m->easy_handle);
         }
@@ -99,7 +107,7 @@ void GoodsBuyer::run()
     }
     curl_multi_cleanup(m_multiHandle);
 
-    emit buyFinish(this, m_buyResults);
+    emit buyFinish(this, new QVector<BuyResult>(m_buyResults));
 }
 
 QString GoodsBuyer::getBodyString(const QMap<QString, QString>& body)
@@ -162,6 +170,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT)
     {
         QString url = APPSTORE_HOST + QString("/shop/checkout");
+        headers.remove("X-Aos-Stk");
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
     }
     else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_RETAIL)
@@ -289,8 +298,6 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         return nullptr;
     }
 
-    QString xAosStkHeader = "X-Aos-Stk: " + userData->m_buyParam.m_xAosStk;
-    curl_easy_setopt(curl, CURLOPT_HEADER, xAosStkHeader.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyResult.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
     return curl;
@@ -329,7 +336,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
         userData->m_buyParam.m_cookies[it.key()] = it.value();
     }
 
-    bool canNextStep = false;
+    bool canNextStep = true;
     if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_NOW)
     {
         canNextStep = handleCheckNowResponse(userData, responseData);
@@ -366,7 +373,6 @@ void GoodsBuyer::handleResponse(CURL* curl)
     else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
     {
         userData->m_buyResult.m_currentStep = STEP_PICKUP_CONTACT;
-
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
     {
@@ -419,8 +425,9 @@ bool GoodsBuyer::handleCheckNowResponse(BuyUserData* userData, QString& response
     if (root.contains("head") && root["head"].toObject().contains("data") &&
             root["head"].toObject()["data"].toObject().contains("url"))
     {
-        QString url = root["head"].toObject()["data"].toObject()["url"].toString();
-        QUrlQuery urlQuery(url);
+        QString urlstring = root["head"].toObject()["data"].toObject()["url"].toString();
+        QUrl url(urlstring);
+        QUrlQuery urlQuery(url.query());
         QString ssi = urlQuery.queryItemValue("ssi");
         if (!ssi.isEmpty())
         {

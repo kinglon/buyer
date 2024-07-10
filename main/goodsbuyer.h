@@ -148,7 +148,7 @@ protected:
 signals:
     void printLog(QString content);
 
-    void buyFinish(GoodsBuyer* buyer, QVector<BuyResult> buyResults);
+    void buyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults);
 
 private:
     QString getBodyString(const QMap<QString, QString>& body);

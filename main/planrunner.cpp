@@ -38,13 +38,27 @@ bool PlanRunner::start()
     {
         return false;
     }
-
     m_planName = plan->m_name;
 
+    // 重建计划数据目录
+    m_planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
+    QDir folderDir(m_planDataPath);
+    if (folderDir.exists() && !SettingManager::getInstance()->m_enableDebug)
+    {
+        if (!folderDir.removeRecursively())
+        {
+            printLog(QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开"));
+            return false;
+        }
+    }
+    CreateDirectory(m_planDataPath.toStdWString().c_str(), nullptr);
+
+    // 获取本地IP列表
     m_localIps = getLocalIps();
     qInfo("the number of the local ips is %d", m_localIps.size());
     if (m_localIps.size() == 0)
     {
+        printLog(QString::fromWCharArray(L"获取本地IP列表失败"));
         return false;
     }
 
@@ -112,6 +126,7 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
     PhoneModel* phoneModel = SettingManager::getInstance()->getPhoneModelByCode(plan->m_phoneCode);
     if (phoneModel == nullptr)
     {
+        printLog(QString::fromWCharArray(L"skuid不存在"));
         return false;
     }
 
@@ -166,47 +181,42 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
 
 bool PlanRunner::launchAddCartRunner(PlanItem* plan)
 {
-    // 重建计划数据目录
-    QString argsFolderPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
-    QDir folderDir(argsFolderPath);
-    if (folderDir.exists())
-    {
-        folderDir.removeRecursively();
-    }
-    CreateDirectory(argsFolderPath.toStdWString().c_str(), nullptr);
-
     // 创建参数文件
-    QString argsFilePath = argsFolderPath + "\\python_args.json";
+    QString argsFilePath = m_planDataPath + "\\python_args.json";
     if (!createAddCardRunnerParamFile(plan, argsFilePath))
     {
         return false;
     }
 
-    // 启动python程序
-    SECURITY_ATTRIBUTES sa;
-    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa.bInheritHandle = TRUE;
-    sa.lpSecurityDescriptor = NULL;
-
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
-    ZeroMemory(&si, sizeof(si));
-    ZeroMemory(&pi, sizeof(pi));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;;
-    si.wShowWindow = SW_HIDE;
-
-    std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"addcart.py";
-    wchar_t command[MAX_PATH];
-    _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), argsFolderPath.toStdWString().c_str());
-    if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
+    // 启动python程序，如果调试就跳过这个步骤
+    HANDLE processHandle = NULL;
+    if (!SettingManager::getInstance()->m_enableDebug)
     {
-        qCritical("failed to create python process, error is %d", GetLastError());
-        return false;
-    }
+        SECURITY_ATTRIBUTES sa;
+        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+        sa.bInheritHandle = TRUE;
+        sa.lpSecurityDescriptor = NULL;
 
-    CloseHandle(pi.hThread);
-    HANDLE processHandle = pi.hProcess;
+        STARTUPINFO si;
+        PROCESS_INFORMATION pi;
+        ZeroMemory(&si, sizeof(si));
+        ZeroMemory(&pi, sizeof(pi));
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW;;
+        si.wShowWindow = SW_HIDE;
+
+        std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"python\\addcart.py";
+        wchar_t command[MAX_PATH];
+        _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), m_planDataPath.toStdWString().c_str());
+        if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
+        {
+            qCritical("failed to create python process, error is %d", GetLastError());
+            return false;
+        }
+
+        CloseHandle(pi.hThread);
+        processHandle = pi.hProcess;
+    }
 
     // 定时检查Python进程状态
     QTimer* timer = new QTimer(this);
@@ -244,7 +254,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
 
 void PlanRunner::queryAddCartRunnerStatus()
 {
-    std::wstring planDataFilePath = CImPath::GetDataPath() + m_planName.toStdWString() + L"\\add_cart_result.json";
+    std::wstring planDataFilePath = m_planDataPath.toStdWString() + L"\\add_cart_result.json";
     QFile file(QString::fromStdWString(planDataFilePath.c_str()));
     if (!file.open(QIODevice::ReadOnly))
     {
@@ -334,7 +344,7 @@ void PlanRunner::launchGoodsChecker()
     m_goodsChecker->start();
 }
 
-void PlanRunner::onGoodsCheckFinish(QVector<ShopItem> shops)
+void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
 {
     m_goodsChecker = nullptr;
     if (m_requestStop)
@@ -342,7 +352,7 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem> shops)
         emit runFinish(m_planId);
     }
 
-    if (!shops.empty())
+    if (shops && !shops->empty())
     {
         printLog(QString::fromWCharArray(L"查询到有货"));
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_BUYING);
@@ -350,7 +360,7 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem> shops)
 
         for (int i=0; i<m_buyParams.size(); i++)
         {
-            m_buyParams[i].m_buyingShop = shops[i%shops.size()];
+            m_buyParams[i].m_buyingShop = (*shops)[i%(*shops).size()];
         }
 
         launchGoodsBuyer();
@@ -360,6 +370,8 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem> shops)
         printLog(QString::fromWCharArray(L"店铺没货"));
         emit runFinish(m_planId);
     }
+
+    delete shops;
 }
 
 void PlanRunner::launchGoodsBuyer()
@@ -411,9 +423,14 @@ void PlanRunner::launchGoodsBuyer()
     }
 }
 
-void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult> buyResults)
+void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults)
 {
-    m_buyResults.append(buyResults);
+    if (buyResults)
+    {
+        m_buyResults.append(*buyResults);
+        delete buyResults;
+        buyResults = nullptr;
+    }
 
     m_goodsBuyers.removeOne(buyer);
     if (m_goodsBuyers.empty())
@@ -425,8 +442,7 @@ void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult> buyResul
 bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
 {
     std::wstring srcExcelFilePath = CImPath::GetConfPath() + L"\\购买结果.xlsx";
-    std::wstring destExcelSavePath = CImPath::GetDataPath() + m_planName.toStdWString();
-    std::wstring destExcelFilePath = destExcelSavePath + L"\\购买结果.xlsx";
+    std::wstring destExcelFilePath = m_planDataPath.toStdWString() + L"\\购买结果.xlsx";
     DeleteFile(destExcelFilePath.c_str());
     if (!CopyFile(srcExcelFilePath.c_str(), destExcelFilePath.c_str(), TRUE))
     {
@@ -475,7 +491,7 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
     QString log = QString::fromWCharArray(L"购买结果保存到：%1").arg(qdestExcelFilePath);
     printLog(log);
 
-    QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(destExcelSavePath)));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_planDataPath));
 
     return true;
 }

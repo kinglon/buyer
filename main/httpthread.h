@@ -25,7 +25,7 @@ public:
 protected:
     virtual int getTimeOutSeconds() { return 3; }
 
-    virtual QVector<QString> getCommonHeaders() { return QVector<QString>(); }
+    virtual QMap<QString,QString> getCommonHeaders() { return QMap<QString,QString>(); }
 
     CURL* makeRequest(QString url,
                       const QMap<QString,QString>& headers,

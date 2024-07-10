@@ -24,6 +24,8 @@ void GoodsAvailabilityChecker::getProxyServer(QVector<ProxyServer>& proxyServers
             return;
         }
 
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+
         CURLcode result = curl_easy_perform(curl);
         if(result != CURLE_OK)
         {
@@ -104,6 +106,14 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
         if (m_mockFinish)
         {
             availShops.append(m_shops[0]);
+            break;
+        }
+
+        int stillRunning = 0;
+        CURLMcode mc = curl_multi_perform(multiHandle, &stillRunning);
+        if (mc)
+        {
+            qCritical("curl_multi_perform return error: %d", mc);
             break;
         }
 
@@ -226,23 +236,40 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
         QJsonArray stores = root["body"].toObject()["content"].toObject()["pickupMessage"].toObject()["stores"].toArray();
         for (auto store : stores)
         {
-            if (store.toObject().contains("retailStore"))
+            QJsonObject storeJsonObj = store.toObject();
+            if (!storeJsonObj.contains("storeNumber"))
             {
-                QJsonObject retailStore = store.toObject()["retailStore"].toObject();
-                if (retailStore.contains("availableNow") && retailStore["availableNow"].toBool())
+                continue;
+            }
+            QString storeNumber = storeJsonObj["storeNumber"].toString();
+
+            if (!storeJsonObj.contains("address") || !storeJsonObj["address"].toObject().contains("postalCode"))
+            {
+                continue;
+            }
+            QString postalCode = storeJsonObj["address"].toObject()["postalCode"].toString();
+
+            QString parts = m_phoneCode + "/A";
+            if (!storeJsonObj.contains("partsAvailability")
+                    || !storeJsonObj["partsAvailability"].toObject().contains(parts))
+            {
+                continue;
+            }
+
+            QJsonObject partsJsonObject = storeJsonObj["partsAvailability"].toObject()[parts].toObject();
+            if (!partsJsonObject.contains("pickupDisplay") || partsJsonObject["pickupDisplay"].toString() != "available")
+            {
+                continue;
+            }
+
+            for (auto& shop : m_shops)
+            {
+                if (shop.m_postalCode == postalCode)
                 {
-                    QString name = retailStore["name"].toString();
-                    QString storeNumber = retailStore["storeNumber"].toString();
-                    for (auto& shop : m_shops)
-                    {
-                        if (shop.m_name.indexOf(name) >= 0)
-                        {
-                            ShopItem shopItem = shop;
-                            shopItem.m_storeNumber = storeNumber;
-                            shops.append(shopItem);
-                            break;
-                        }
-                    }
+                    ShopItem shopItem = shop;
+                    shopItem.m_storeNumber = storeNumber;
+                    shops.append(shopItem);
+                    break;
                 }
             }
         }
@@ -254,10 +281,13 @@ void GoodsAvailabilityChecker::run()
     if (m_shops.empty() || m_phoneCode.isEmpty())
     {
         qCritical("param is wrong");
-        emit checkFinish(QVector<ShopItem>());
+        emit checkFinish(nullptr);
         return;
 
     }
+
+    m_reqIntervalMs = SettingManager::getInstance()->m_queryGoodInterval;
+    m_maxReqCount = getTimeOutSeconds() * 1000 / m_reqIntervalMs;
 
     // 获取代理IP池
     QVector<ProxyServer> proxyServers;
@@ -265,29 +295,24 @@ void GoodsAvailabilityChecker::run()
     if (proxyServers.empty())
     {
         emit printLog(QString::fromWCharArray(L"获取代理IP池失败"));
-        emit checkFinish(QVector<ShopItem>());
+        emit checkFinish(nullptr);
         return;
     }
     m_proxyServers = proxyServers;
 
     // 查询是否有货
     QVector<ShopItem> shops = queryIfGoodsAvailable();
-    emit checkFinish(shops);
+    emit checkFinish(new QVector<ShopItem>(shops));
 }
 
 
-QVector<QString> GoodsAvailabilityChecker::getCommonHeaders()
+QMap<QString,QString> GoodsAvailabilityChecker::getCommonHeaders()
 {
-    QVector<QString> headers;
-
-    QString origin = QString("Origin: ") + APPLE_HOST;
-    headers.push_back(origin);
-
-    QString referer = QString("Referer: ") + APPLE_HOST;
-    headers.push_back(referer);
-
-    headers.push_back("Syntax: graviton");
-    headers.push_back("Modelversion: v2");
+    QMap<QString,QString> headers;
+    headers["Origin"] = APPLE_HOST;
+    headers["Referer"] = APPLE_HOST;
+    headers["Syntax"] = "graviton";
+    headers["Modelversion"] = "v2";
 
     return headers;
 }

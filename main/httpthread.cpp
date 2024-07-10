@@ -66,21 +66,29 @@ CURL* HttpThread::makeRequest(QString url,
     }
 
     curl_easy_setopt(handle, CURLOPT_TIMEOUT, getTimeOutSeconds());
-    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, getTimeOutSeconds());
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, getTimeOutSeconds()*1000);
     curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
     curl_easy_setopt(handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
     curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br, zstd");
     curl_easy_setopt(handle, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
 
-    struct curl_slist* curlHeaders = nullptr;
-    curlHeaders = curl_slist_append(curlHeaders, "Content-Type: application/json");
-    curlHeaders = curl_slist_append(curlHeaders, "Accept: application/json, text/plain, */*");
-    curlHeaders = curl_slist_append(curlHeaders, "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8");
-    for (const auto& header : getCommonHeaders())
+    QMap<QString,QString> headerSummary;
+    headerSummary["Content-Type"] = "Content-Type: application/json";
+    headerSummary["Accept"] = "application/json, text/plain, */*";
+    headerSummary["Accept-Language"] = "zh-CN,zh;q=0.9,en;q=0.8";
+
+    QMap<QString,QString> commonHeaders = getCommonHeaders();
+    for (auto it=commonHeaders.begin(); it != commonHeaders.end(); it++)
     {
-        curlHeaders = curl_slist_append(curlHeaders, header.toStdString().c_str());
+        headerSummary[it.key()] = it.value();
     }
-    for (auto it = headers.begin(); it != headers.end(); it++)
+    for (auto it=headers.begin(); it!=headers.end(); it++)
+    {
+        headerSummary[it.key()] = it.value();
+    }
+
+    struct curl_slist* curlHeaders = nullptr;
+    for (auto it = headerSummary.begin(); it != headerSummary.end(); it++)
     {
         QString h = it.key() + ": " + it.value();
         curlHeaders = curl_slist_append(curlHeaders, h.toStdString().c_str());
@@ -132,7 +140,12 @@ QMap<QString, QString> HttpThread::getCookies(CURL* curl)
             if (equalsPos != std::string::npos)
             {
                 std::string key = setCookieHeader.substr(0, equalsPos);
+                int fenhaoPos = setCookieHeader.find(';');
                 std::string value = setCookieHeader.substr(equalsPos + 1);
+                if (fenhaoPos != -1)
+                {
+                    value = setCookieHeader.substr(equalsPos + 1, fenhaoPos - equalsPos -1);
+                }
 
                 // Remove leading and trailing spaces from the key and value
                 size_t keyStart = key.find_first_not_of(" \t");

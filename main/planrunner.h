@@ -57,15 +57,17 @@ private slots:
     void printLog(const QString& content);
 
     // 有货
-    void onGoodsCheckFinish(QVector<ShopItem> shops);
+    void onGoodsCheckFinish(QVector<ShopItem>* shops);
 
     // 购买完成
-    void onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult> buyResults);
+    void onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults);
 
 private:
     QString m_planId;
 
     QString m_planName;
+
+    QString m_planDataPath;
 
     bool m_requestStop = false;
 
