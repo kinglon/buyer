@@ -49,9 +49,9 @@ def test():
     data_model.last_name = 'Ye'
     data_model.telephone = '08054897787'
     data_model.email = '415571971@qq.com'
-    data_model.credit_card_no = '5353076881524591'
-    data_model.expired_date = '05/26'
-    data_model.cvv = '162'
+    data_model.credit_card_no = '5552316915478540'
+    data_model.expired_date = '03/25'
+    data_model.cvv = '326'
     data_model.postal_code = '104-8125'
     data_model.state = '北海道'
     data_model.city = 'Fuzhou'
@@ -144,26 +144,22 @@ def test_v2():
     apple_util = AppleUtil()
 
     data_model = DataModel()
-    data_model.account = 'ii5pfw9mvfw9i@163.com'
-    data_model.password = 'Qf223322'
+    data_model.account = '158653658@163.com'
+    data_model.password = 'Cxh520941'
     data_model.store = 'R079'
     data_model.first_name = 'Jeric'
     data_model.last_name = 'Ye'
     data_model.telephone = '08054897787'
     data_model.email = '415571971@qq.com'
-    data_model.credit_card_no = '5353076881524591'
-    data_model.expired_date = '05/26'
-    data_model.cvv = '162'
+    data_model.credit_card_no = '5353073996693999'
+    data_model.expired_date = '03/25'
+    data_model.cvv = '108'
     data_model.postal_code = '104-8125'
     data_model.state = '北海道'
     data_model.city = 'Fuzhou'
     data_model.street = 'Changshan'
     data_model.street2 = 'Zhaixianyuan'
     data_model.giftcard_no = ''
-
-    # 登录
-    if not apple_util.login(data_model.account, data_model.password):
-        return
 
     # 添加商品
     model = 'iphone-15-pro'
@@ -176,13 +172,13 @@ def test_v2():
     if x_aos_stk is None:
         return
 
-    # 查询是否有货
-    if not apple_util.query_product_available(data_model.postal_code, product):
-        return
-
     # 进入购物流程
     ssi = apple_util.checkout_now(x_aos_stk)
     if ssi is None:
+        return
+
+    # 登录
+    if not apple_util.login(data_model.account, data_model.password):
         return
 
     # 绑定账号
@@ -203,6 +199,10 @@ def test_v2():
     if not apple_util.fulfillment_retail(x_aos_stk):
         return
 
+    # 查询是否有货
+    if not apple_util.query_product_available(data_model.postal_code, product):
+        return
+
     # 选择店铺
     if not apple_util.fulfillment_store(x_aos_stk, data_model):
         return
@@ -219,31 +219,36 @@ def test_v2():
     if not apple_util.review(x_aos_stk):
         return
 
-    # 处理订单
-    if not apple_util.query_process_result(x_aos_stk):
+    # 查询处理结果
+    while True:
+        time.sleep(2)
+        # 处理订单
+        finish, sucess = apple_util.query_process_result(x_aos_stk)
+        if not finish:
+            continue
+        break
+
+    if not sucess:
         return
 
     # 查询订单号
-    while True:
-        time.sleep(2)
-        order_no = apple_util.query_order_no()
-        if order_no:
-            print('order number: {}'.format(order_no))
-            break
-        else:
-            print('query order number...')
+    order_no = apple_util.query_order_no()
+    if order_no is None:
+        print('未查询到订单号')
+        return
+    print('订单号是：{}'.format(order_no))
 
 
 def main():
     # test_encrypt()
     # test_get_complete_data()
-    test_login()
+    # test_login()
     # test_add_cart()
     # test_query_product_available()
     # test_login_and_addcart()
     # test_order()
     # test()
-    # test_v2()
+    test_v2()
     print('done')
 
 
