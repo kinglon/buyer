@@ -122,6 +122,7 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
     QJsonObject root;
     root["use_proxy"] = SettingManager::getInstance()->m_useProxy;
     root["proxy_region"] = SettingManager::getInstance()->m_proxyRegion;
+    root["thread_num"] = plan->m_addCartThreadCount;
 
     PhoneModel* phoneModel = SettingManager::getInstance()->getPhoneModelByCode(plan->m_phoneCode);
     if (phoneModel == nullptr)
@@ -225,15 +226,13 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
             timer->deleteLater();
             TerminateProcess(processHandle, 1);
             CloseHandle(processHandle);
-            emit runFinish(m_planId);
+            emit runFinish(m_planId, false);
             return;
         }
 
-        // python程序还在运行，继续等待
-        DWORD exitCode = 0;
-        if (GetExitCodeProcess(processHandle, &exitCode) && exitCode == STILL_ACTIVE)
+        // 查询上货状态
+        if (!queryAddCartRunnerStatus())
         {
-            printLog(QString::fromWCharArray(L"加货中"));
             return;
         }
 
@@ -242,73 +241,136 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         timer->deleteLater();
         CloseHandle(processHandle);
 
-        // 查询上货状态
-        queryAddCartRunnerStatus();
+        if (!loadAddCartResult())
+        {
+            emit runFinish(m_planId, false);
+            return;
+        }
+
+        printLog(QString::fromWCharArray(L"上号成功"));
+        PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
+        emit planStatusChange(m_planId);
+        launchGoodsChecker();
     });
     timer->start();
 
     return true;
 }
 
-void PlanRunner::queryAddCartRunnerStatus()
+bool PlanRunner::queryAddCartRunnerStatus()
+{
+    std::wstring planDataFilePath = m_planDataPath.toStdWString() + L"\\add_cart_progress.json";
+    QFile file(QString::fromStdWString(planDataFilePath.c_str()));
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        return false;
+    }    
+    QByteArray jsonData = file.readAll();
+    file.close();
+
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        return false;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    bool finish = false;
+    QString finishMessage;
+    int totalCount = 0;
+    int successCount = 0;
+    int failCount = 0;
+    if (root.contains("total"))
+    {
+        totalCount = root["total"].toInt();
+    }
+    if (root.contains("success_count"))
+    {
+        successCount = root["success_count"].toInt();
+    }
+    if (root.contains("fail_count"))
+    {
+        failCount = root["fail_count"].toInt();
+    }
+    if (root.contains("finish"))
+    {
+        finish = root["finish"].toBool();
+    }
+    if (root.contains("finish_message"))
+    {
+        finishMessage = root["finish_message"].toString();
+    }
+
+    printLog(QString::fromWCharArray(L"上号中：%1/%2").arg(successCount+failCount, totalCount));
+    if (!finish)
+    {
+        return false;
+    }
+
+    if (!finishMessage.isEmpty())
+    {
+        printLog(finishMessage);
+    }
+
+    printLog(QString::fromWCharArray(L"上号完成，总共%1，成功%2，失败%3").arg(totalCount, successCount, failCount));
+    if (failCount > 0)
+    {
+        printLog(QString::fromWCharArray(L"上号失败的账号保存在：上号失败账号.txt"));
+    }
+
+    return true;
+}
+
+bool PlanRunner::loadAddCartResult()
 {
     std::wstring planDataFilePath = m_planDataPath.toStdWString() + L"\\add_cart_result.json";
     QFile file(QString::fromStdWString(planDataFilePath.c_str()));
     if (!file.open(QIODevice::ReadOnly))
     {
-        printLog(QString::fromWCharArray(L"加货失败，无法打开结果文件"));
-        emit runFinish(m_planId);
-        return;
+        printLog(QString::fromWCharArray(L"上号结果文件加载失败"));
+        return false;
     }
-    else
+    QByteArray jsonData = file.readAll();
+    file.close();
+
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
     {
-        QByteArray jsonData = file.readAll();
-        file.close();
-
-        QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
-        if (jsonDocument.isNull() || jsonDocument.isEmpty())
-        {
-            printLog(QString::fromWCharArray(L"加货失败，无法解析结果文件"));
-            emit runFinish(m_planId);
-            return;
-        }
-
-        QJsonObject root = jsonDocument.object();
-        bool success = root["success"].toBool();
-        if (!success)
-        {
-            printLog(QString::fromWCharArray(L"加货失败，%1").arg(root["message"].toString()));
-            emit runFinish(m_planId);
-            return;
-        }
-
-        for (auto buyParamJson : root["buy_param"].toArray())
-        {
-            BuyParam buyParam;
-            buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
-
-            QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
-            for (auto& cookieKey : cookieJson.keys())
-            {
-                buyParam.m_cookies[cookieKey] = cookieJson[cookieKey].toString();
-            }
-
-            QString accountId = buyParamJson.toObject()["account"].toString();
-            UserItem user = UserInfoManager::getInstance()->getUserByAccount(accountId);
-            if (user.m_accountName.isEmpty())
-            {
-                emit runFinish(m_planId);
-                return;
-            }
-            buyParam.m_user = user;
-            m_buyParams.append(buyParam);
-        }
-
-        printLog(QString::fromWCharArray(L"加货完成"));
-        PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
-        emit planStatusChange(m_planId);
-        launchGoodsChecker();
+        printLog(QString::fromWCharArray(L"上号结果文件解析失败"));
+        return false;
     }
+
+    QJsonObject root = jsonDocument.object();
+    for (auto buyParamJson : root["buy_param"].toArray())
+    {
+        BuyParam buyParam;
+        buyParam.m_appStoreHost = buyParamJson.toObject()["appstore_host"].toString();
+        buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
+
+        QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
+        for (auto& cookieKey : cookieJson.keys())
+        {
+            buyParam.m_cookies[cookieKey] = cookieJson[cookieKey].toString();
+        }
+
+        QString accountId = buyParamJson.toObject()["account"].toString();
+        UserItem user = UserInfoManager::getInstance()->getUserByAccount(accountId);
+        if (user.m_accountName.isEmpty())
+        {
+            printLog(QString::fromWCharArray(L"找不到账号信息：%1").arg(accountId));
+            return false;
+        }
+        buyParam.m_user = user;
+        m_buyParams.append(buyParam);
+    }
+
+    if (m_buyParams.size() == 0)
+    {
+        printLog(QString::fromWCharArray(L"上号成功个数为0"));
+        return false;
+    }
+
+    return true;
 }
 
 void PlanRunner::launchGoodsChecker()
@@ -319,27 +381,74 @@ void PlanRunner::launchGoodsChecker()
         return;
     }
 
-    m_goodsChecker = new GoodsAvailabilityChecker();
-    m_goodsChecker->setPhoneCode(plan->m_phoneCode);
-
-    QVector<ShopItem> queryShops;
-    for (const auto& shopId : plan->m_buyingShops)
+    if (plan->m_enableFixTimeBuy)
     {
-        for (const auto& shop : SettingManager::getInstance()->m_shops)
+        // 定时购买，开定时器等时间
+        int fixBuyTime = plan->m_fixBuyTime;
+        QVector<ShopItem>* shops = new QVector<ShopItem>();
+        for (const auto& shopId : plan->m_buyingShops)
         {
-            if (shop.m_name == shopId)
+            for (const auto& shop : SettingManager::getInstance()->m_shops)
             {
-                queryShops.append(shop);
-                break;
+                if (shop.m_name == shopId)
+                {
+                    shops->append(shop);
+                    break;
+                }
             }
         }
-    }
-    m_goodsChecker->setShops(queryShops);
 
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
-    m_goodsChecker->start();
+        QTimer* timer = new QTimer(this);
+        timer->setInterval(20);
+        connect(timer, &QTimer::timeout, [this, timer, fixBuyTime, shops]() {
+            // 如果外部要求退出，就结束
+            if (m_requestStop)
+            {
+                delete shops;
+                timer->stop();
+                timer->deleteLater();
+                emit runFinish(m_planId, false);
+                return;
+            }
+
+            QDateTime now = QDateTime::currentDateTime();
+            if (now.time().secsTo(QTime(0,0)) < fixBuyTime)
+            {
+                return;
+            }
+
+            timer->stop();
+            timer->deleteLater();
+
+            onGoodsCheckFinish(shops);
+        });
+        timer->start();
+    }
+    else
+    {
+        // 实时查询
+        m_goodsChecker = new GoodsAvailabilityChecker();
+        m_goodsChecker->setPhoneCode(plan->m_phoneCode);
+
+        QVector<ShopItem> queryShops;
+        for (const auto& shopId : plan->m_buyingShops)
+        {
+            for (const auto& shop : SettingManager::getInstance()->m_shops)
+            {
+                if (shop.m_name == shopId)
+                {
+                    queryShops.append(shop);
+                    break;
+                }
+            }
+        }
+        m_goodsChecker->setShops(queryShops);
+
+        connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
+        connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
+        connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
+        m_goodsChecker->start();
+    }
 }
 
 void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
@@ -347,7 +456,9 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
     m_goodsChecker = nullptr;
     if (m_requestStop)
     {
-        emit runFinish(m_planId);
+        delete shops;
+        emit runFinish(m_planId, false);
+        return;
     }
 
     if (shops && !shops->empty())
@@ -366,7 +477,7 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
     else
     {
         printLog(QString::fromWCharArray(L"店铺没货"));
-        emit runFinish(m_planId);
+        emit runFinish(m_planId, false);
     }
 
     delete shops;
@@ -401,12 +512,14 @@ void PlanRunner::launchGoodsBuyer()
             continue;
         }
 
+        qint64 now = GetTickCount64();
         QVector<QString> localIps;
         QVector<BuyParam> buyParams;
         for (int j=0; j<realCount; j++)
         {
             int index = i*countPerThread+j;
             localIps.push_back(m_localIps[index % m_localIps.size()]);
+            m_buyParams[index].m_beginBuyTime = now;
             buyParams.push_back(m_buyParams[index]);
         }
 
@@ -494,5 +607,5 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
 void PlanRunner::finishPlan()
 {
     saveBuyingResult(m_buyResults);
-    emit runFinish(m_planId);
+    emit runFinish(m_planId, true);
 }

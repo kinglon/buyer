@@ -119,6 +119,7 @@ def add_cart(proxys, users, phone_model):
 
             buy_param = {
                 'account': account,
+                'appstore_host': apple_util.appstore_host,
                 'x_aos_stk': x_aos_stk,
                 'cookies': apple_util.cookies
             }

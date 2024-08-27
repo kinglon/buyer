@@ -25,7 +25,7 @@ signals:
 
     void planStatusChange(QString planId);
 
-    void runFinish(QString planId);
+    void runFinish(QString planId, bool success);
 
 private:
     // 获取本地IP列表
@@ -37,8 +37,11 @@ private:
     // 启动python程序上货
     bool launchAddCartRunner(PlanItem* plan);
 
-    // 查询python程序运行结果
-    void queryAddCartRunnerStatus();
+    // 查询python程序运行结果，true上号结束
+    bool queryAddCartRunnerStatus();
+
+    // 加载上号成功的数据
+    bool loadAddCartResult();
 
     // 启动是否有货检测器
     void launchGoodsChecker();

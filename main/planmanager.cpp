@@ -30,8 +30,11 @@ void PlanManager::save()
         planJson["name"] = plan.m_name;
         planJson["phone_code"] = plan.m_phoneCode;
         planJson["count"] = plan.m_count;
+        planJson["add_cart_thread_count"] = plan.m_addCartThreadCount;
         planJson["thread_count"] = plan.m_threadCount;
         planJson["payment"] = plan.m_payment;
+        planJson["enable_fix_time_buy"] = plan.m_enableFixTimeBuy;
+        planJson["fix_buy_time"] = plan.m_fixBuyTime;
 
         QJsonArray shopsJson;
         for (const auto& shop : plan.m_buyingShops)
@@ -79,8 +82,11 @@ void PlanManager::load()
         planItem.m_name = planJson["name"].toString();
         planItem.m_phoneCode = planJson["phone_code"].toString();
         planItem.m_count = planJson["count"].toInt();
+        planItem.m_addCartThreadCount = planJson["add_cart_thread_count"].toInt();
         planItem.m_threadCount = planJson["thread_count"].toInt();
         planItem.m_payment = planJson["payment"].toInt();
+        planItem.m_enableFixTimeBuy = planJson["enable_fix_time_buy"].toBool();
+        planItem.m_fixBuyTime = planJson["fix_buy_time"].toInt();
 
         planItem.m_buyingShops.clear();
         QJsonArray shops = planJson["shop"].toArray();

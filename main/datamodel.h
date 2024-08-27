@@ -10,11 +10,11 @@
 #define PAYMENT_GIFT_CARD       2
 
 // 计划状态
-#define PLAN_STATUS_TO_ADD_CART         1   // 待加货
-#define PLAN_STATUS_ADD_CART            2   // 加货中
-#define PLAN_STATUS_QUERY               3   // 查货中
-#define PLAN_STATUS_BUYING              4   // 购买中
-#define PLAN_STATUS_STOPPING            5   // 停止中
+#define PLAN_STATUS_INIT                1   // 初始化
+#define PLAN_STATUS_ADD_CART            2   // 上号中
+#define PLAN_STATUS_QUERY               3   // 上号成功
+#define PLAN_STATUS_BUYING              4   // 正在购物
+#define PLAN_STATUS_STOPPING            5   // 购物结束
 
 class UserItem
 {
@@ -93,8 +93,17 @@ public:
     // 购买数量
     int m_count = 1;
 
-    // 线程数
+    // 上号线程数
+    int m_addCartThreadCount = 1;
+
+    // 抢购线程数
     int m_threadCount = 1;
+
+    // 是否开启定时购买
+    bool m_enableFixTimeBuy = false;
+
+    // 定时购买的时间，秒数
+    int m_fixBuyTime = 0;
 
     // 购买店铺列表
     QVector<QString> m_buyingShops;
@@ -103,30 +112,30 @@ public:
     int m_payment = PAYMENT_CREDIT_CARD;
 
     // 状态
-    int m_status = PLAN_STATUS_TO_ADD_CART;
+    int m_status = PLAN_STATUS_INIT;
 
 public:
     static QString getStatusName(int status)
     {
-        if (status == PLAN_STATUS_TO_ADD_CART)
+        if (status == PLAN_STATUS_INIT)
         {
-            return QString::fromWCharArray(L"待加货");
+            return QString::fromWCharArray(L"");
         }
         else if (status == PLAN_STATUS_ADD_CART)
         {
-            return QString::fromWCharArray(L"加货中");
+            return QString::fromWCharArray(L"上号中");
         }
         else if (status == PLAN_STATUS_QUERY)
         {
-            return QString::fromWCharArray(L"查货中");
+            return QString::fromWCharArray(L"上号成功");
         }
         else if (status == PLAN_STATUS_BUYING)
         {
-            return QString::fromWCharArray(L"购买中");
+            return QString::fromWCharArray(L"正在购物");
         }
         else if (status == PLAN_STATUS_STOPPING)
         {
-            return QString::fromWCharArray(L"停止中");
+            return QString::fromWCharArray(L"购物结束");
         }
         else
         {

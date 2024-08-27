@@ -7,11 +7,6 @@
 #include "datamodel.h"
 
 // 购买步骤
-#define STEP_CHECKOUT_NOW       1   // 前往购买
-#define STEP_BIND_ACCOUNT       2   // 绑定账号
-#define STEP_CHECKOUT_START     3   // 开始购买1
-#define STEP_CHECKOUT           4   // 开始购买2
-#define STEP_FULFILLMENT_RETAIL 5   // 选择自提
 #define STEP_FULFILLMENT_STORE  6   // 选择店铺
 #define STEP_PICKUP_CONTACT     7   // 选择联系人
 #define STEP_BILLING            8   // 支付
@@ -33,6 +28,12 @@ public:
 
     // x_aos_stk
     QString m_xAosStk;
+
+    // appstore_host
+    QString m_appStoreHost;
+
+    // 开始购买时间, GetTickCount64返回的值
+    qint64 m_beginBuyTime = 0;
 };
 
 class BuyResult
@@ -45,7 +46,7 @@ public:
     QString m_orderNo;
 
     // 步骤
-    int m_currentStep = STEP_CHECKOUT_NOW;
+    int m_currentStep = STEP_FULFILLMENT_STORE;
 
     // 每个步骤的耗时，毫秒数
     QVector<int> m_takeTimes;
@@ -53,30 +54,16 @@ public:
     // 发送IP地址
     QString m_localIp;
 
+    // 标志是否成功下单
+    bool m_success = false;
+
+    // 下单失败的原因
+    QString m_failReason;
+
 public:
     QString getStepName() const
     {
-        if (m_currentStep == STEP_CHECKOUT_NOW)
-        {
-            return QString::fromWCharArray(L"前往购买");
-        }
-        else if (m_currentStep == STEP_BIND_ACCOUNT)
-        {
-            return QString::fromWCharArray(L"绑定账号");
-        }
-        else if (m_currentStep == STEP_CHECKOUT_START)
-        {
-            return QString::fromWCharArray(L"开始购买1");
-        }
-        else if (m_currentStep == STEP_CHECKOUT)
-        {
-            return QString::fromWCharArray(L"开始购买2");
-        }
-        else if (m_currentStep == STEP_FULFILLMENT_RETAIL)
-        {
-            return QString::fromWCharArray(L"选择自提");
-        }
-        else if (m_currentStep == STEP_FULFILLMENT_STORE)
+        if (m_currentStep == STEP_FULFILLMENT_STORE)
         {
             return QString::fromWCharArray(L"选择店铺");
         }
@@ -157,11 +144,8 @@ private:
 
     void handleResponse(CURL* curl);
 
-    bool handleCheckNowResponse(BuyUserData* userData, QString& responseData);
-
-    bool handleBindAccountResponse(BuyUserData* userData, QString& responseData);
-
-    bool handleCheckoutResponse(BuyUserData* userData, QString& responseData);
+    // 处理中，返回true表示已经处理完成
+    bool handleProcessResponse(BuyUserData* userData, QString& responseData);
 
     bool handleQueryOrderResponse(BuyUserData* userData, QString& responseData);
 

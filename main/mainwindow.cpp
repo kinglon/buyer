@@ -172,8 +172,8 @@ void MainWindow::onRunPlanBtn(QString planId)
     connect(planRunner, &PlanRunner::planStatusChange, [this] (QString planId) {
         updatePlanListItemCtrl(planId);
     });
-    connect(planRunner, &PlanRunner::runFinish, [this] (QString planId) {
-        PlanManager::getInstance()->setPlanStatus(planId, PLAN_STATUS_TO_ADD_CART);
+    connect(planRunner, &PlanRunner::runFinish, [this] (QString planId, bool success) {
+        PlanManager::getInstance()->setPlanStatus(planId, success?PLAN_STATUS_STOPPING:PLAN_STATUS_INIT);
         updatePlanListItemCtrl(planId);
         PlanRunner* planRunner = m_planRunners[planId];
         m_planRunners[planId] = nullptr;
@@ -201,9 +201,6 @@ void MainWindow::onStopPlanBtn(QString planId)
         qCritical("the plan has not been running");
         return;
     }
-
-    PlanManager::getInstance()->setPlanStatus(planId, PLAN_STATUS_STOPPING);
-    updatePlanListItemCtrl(planId);
 
     planRunner->stop();
 }

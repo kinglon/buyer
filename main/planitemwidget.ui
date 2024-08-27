@@ -214,7 +214,7 @@
        </size>
       </property>
       <property name="text">
-       <string>待加货</string>
+       <string>初始化</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

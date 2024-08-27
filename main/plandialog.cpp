@@ -40,7 +40,7 @@ void PlanDialog::initCtrls()
 
     int threadCount = QThread::idealThreadCount();
     QString threadCountString = QString::fromWCharArray(L"总线程数%1").arg(threadCount);
-    ui->totalThreadCountLabel->setText(threadCountString);
+    ui->totalThreadCountLabel->setText(threadCountString);    
 
     connect(ui->cancelBtn, &QPushButton::clicked, [this] () {
         close();
@@ -90,6 +90,18 @@ void PlanDialog::updateCtrls()
    ui->countEdit->setText(QString::number(m_planItem.m_count));
 
    ui->threadCountEdit->setText(QString::number(m_planItem.m_threadCount));
+
+   if (m_planItem.m_enableFixTimeBuy)
+   {
+       ui->fixTimeCheckBox->setChecked(true);
+       ui->fixTimeEdit->setTime(QTime(0,0).addSecs(m_planItem.m_fixBuyTime));
+   }
+   else
+   {
+       ui->fixTimeCheckBox->setChecked(false);
+       QDateTime now = QDateTime::currentDateTime();
+       ui->fixTimeEdit->setTime(QTime(now.time().hour(),0));
+   }
 
    updateShopCtrls();
 }
@@ -158,6 +170,12 @@ void PlanDialog::onOkBtn()
         return;
     }
     m_planItem.m_threadCount = threadCount;
+
+    m_planItem.m_enableFixTimeBuy = ui->fixTimeCheckBox->isChecked();
+    if (m_planItem.m_enableFixTimeBuy)
+    {
+        m_planItem.m_fixBuyTime = ui->fixTimeEdit->time().secsTo(QTime(0,0));
+    }
 
     if (m_planItem.m_buyingShops.empty())
     {

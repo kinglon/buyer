@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>478</width>
-    <height>306</height>
+    <width>465</width>
+    <height>382</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,8 +18,8 @@
     <rect>
      <x>21</x>
      <y>0</y>
-     <width>412</width>
-     <height>307</height>
+     <width>421</width>
+     <height>381</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -45,13 +45,13 @@
        <widget class="QLabel" name="label">
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>16777215</height>
          </size>
         </property>
@@ -74,13 +74,13 @@
        <widget class="QLabel" name="label_2">
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>16777215</height>
          </size>
         </property>
@@ -107,13 +107,13 @@
        <widget class="QLabel" name="label_3">
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>16777215</height>
          </size>
         </property>
@@ -143,13 +143,13 @@
        <widget class="QLabel" name="label_4">
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>16777215</height>
          </size>
         </property>
@@ -167,23 +167,52 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_7">
+     <layout class="QHBoxLayout" name="horizontalLayout_8">
       <item>
-       <widget class="QLabel" name="label_6">
+       <widget class="QLabel" name="label_7">
         <property name="minimumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>60</width>
+          <width>70</width>
           <height>16777215</height>
          </size>
         </property>
         <property name="text">
-         <string>线程数</string>
+         <string>上号线程数</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="addCartThreadCountEdit"/>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_7">
+      <item>
+       <widget class="QLabel" name="label_6">
+        <property name="minimumSize">
+         <size>
+          <width>70</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>70</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>抢购线程数</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -208,6 +237,54 @@
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
         </property>
        </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_9">
+      <item>
+       <widget class="QLabel" name="label_8">
+        <property name="minimumSize">
+         <size>
+          <width>70</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>70</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>定时购买</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="fixTimeCheckBox">
+        <property name="minimumSize">
+         <size>
+          <width>20</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>20</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTimeEdit" name="fixTimeEdit"/>
       </item>
      </layout>
     </item>

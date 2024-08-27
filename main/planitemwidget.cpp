@@ -29,7 +29,7 @@ void PlanItemWidget::initCtrls()
         emit deletePlan(m_planId);
     });
 
-    connect(ui->runBtn, &QPushButton::clicked, [this]() {
+    connect(ui->runBtn, &QPushButton::clicked, [this]() {        
         if (isRunning())
         {
             emit stopPlan(m_planId);
@@ -44,12 +44,17 @@ void PlanItemWidget::initCtrls()
 bool PlanItemWidget::isRunning()
 {
     PlanItem* planItem = PlanManager::getInstance()->getPlanById(m_planId);
-    if (planItem && planItem->m_status != PLAN_STATUS_TO_ADD_CART)
+    if (planItem == nullptr)
     {
-        return true;
+        return false;
     }
 
-    return false;
+    if (planItem->m_status == PLAN_STATUS_INIT || planItem->m_status == PLAN_STATUS_STOPPING)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 void PlanItemWidget::updateCtrls()
@@ -70,33 +75,17 @@ void PlanItemWidget::updateCtrls()
 
     ui->payLabel->setText(PlanItem::getPaymentName(planItem->m_payment));
     ui->countLabel->setText(QString::number(planItem->m_count));
-    ui->statusLabel->setText(PlanItem::getStatusName(planItem->m_status));
-
-    if (planItem->m_status == PLAN_STATUS_STOPPING)
-    {
-        ui->runBtn->setEnabled(false);
-    }
-    else
-    {
-        ui->runBtn->setEnabled(true);
-    }
+    ui->statusLabel->setText(PlanItem::getStatusName(planItem->m_status));    
 
     if (!isRunning())
     {
         ui->runBtn->setText(QString::fromWCharArray(L"运行"));
-    }
-    else
-    {
-        ui->runBtn->setText(QString::fromWCharArray(L"停止"));
-    }
-
-    if (planItem->m_status == PLAN_STATUS_TO_ADD_CART)
-    {
         ui->editBtn->setEnabled(true);
         ui->deleteBtn->setEnabled(true);
     }
     else
     {
+        ui->runBtn->setText(QString::fromWCharArray(L"停止"));
         ui->editBtn->setEnabled(false);
         ui->deleteBtn->setEnabled(false);
     }

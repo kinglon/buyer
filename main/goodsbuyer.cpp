@@ -11,7 +11,6 @@
 #include "settingmanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
-#define APPSTORE_HOST "https://secure6.store.apple.com/jp"
 
 GoodsBuyer::GoodsBuyer(QObject *parent)
     : HttpThread{parent}
@@ -28,15 +27,16 @@ void GoodsBuyer::run()
         emit buyFinish(this, nullptr);
     }
 
-    // 初始化每个购买流程
+    // 初始化每个购买流程，从选择店铺步骤开始
     int64_t beginTime = GetTickCount64();
     for (int i=0; i<m_buyParams.size(); i++)
     {
         BuyUserData* userData = new BuyUserData();
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
-        userData->m_buyResult.m_currentStep = STEP_CHECKOUT_NOW;
+        userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
         userData->m_buyResult.m_localIp = m_localIps[i%m_localIps.size()];
-        userData->m_buyParam = m_buyParams[i];        
+        userData->m_buyParam = m_buyParams[i];
+        userData->m_buyResult.m_takeTimes.append(GetTickCount64()-userData->m_buyParam.m_beginBuyTime);
         userData->m_stepBeginTime = beginTime;
 
         CURL* curl = makeBuyingRequest(userData);
@@ -134,71 +134,16 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     headers["Modelversion"] = "v2";
 
     CURL* curl = nullptr;
-    if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_NOW)
+    if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
     {
-        QString url = QString(APPLE_HOST) + "/shop/bagx/checkout_now?_a=checkout&_m=shoppingCart.actions";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "cart";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-        if (curl)
-        {
-            setPostMethod(curl, "shoppingCart.recommendations.recommendedItem.part=&shoppingCart.bagSavedItems.part=&shoppingCart.bagSavedItems.listId=&shoppingCart.bagSavedItems.childPart=&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.isIntentToGift=false&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.itemQuantity.quantity=1&shoppingCart.locationConsent.locationConsent=false&shoppingCart.summary.promoCode.promoCode=&shoppingCart.actions.fcscounter=&shoppingCart.actions.fcsdata=");
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_BIND_ACCOUNT)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/signIn/idms/authx?ssi=%1&up=true").arg(userData->m_ssi);
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "signInPage";
-        userData->m_buyParam.m_cookies["as_dc"] = "ucp3";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-        if (curl)
-        {
-            setPostMethod(curl, "deviceID=TF1%3B015%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3BMozilla%3BNetscape%3B5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3B20030107%3Bundefined%3Btrue%3B%3Btrue%3BWin32%3Bundefined%3BMozilla%2F5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3Bzh-CN%3Bundefined%3Bsecure6.store.apple.com%3Bundefined%3Bundefined%3Bundefined%3Bundefined%3Bfalse%3Bfalse%3B1719370448096%3B8%3B2005%2F6%2F7%252021%253A33%253A44%3B1366%3B768%3B%3B%3B%3B%3B%3B%3B%3B-480%3B-480%3B2024%2F6%2F26%252010%253A54%253A08%3B24%3B1366%3B728%3B0%3B0%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B25%3B&grantCode=");
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_START)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/checkout/start");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-        if (curl)
-        {
-            QString body = QString("pltn=%1").arg(userData->m_pltn);
-            setPostMethod(curl, body);
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/checkout");        
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_RETAIL)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx/fulfillment?_a=selectFulfillmentLocationAction&_m=checkout.fulfillment.fulfillmentOptions");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Fulfillment-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-        if (curl)
-        {
-            setPostMethod(curl, "checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL");
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Fulfillment-init";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Fulfillment-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
@@ -209,12 +154,14 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=continueFromPickupContactToBilling&_m=checkout.pickupContact");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx?_a=continueFromPickupContactToBilling&_m=checkout.pickupContact");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=PickupContact-init";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=PickupContact-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
@@ -232,12 +179,14 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_BILLING)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Billing-init";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Billing-init";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
@@ -271,12 +220,14 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx/review?_a=continueFromReviewToProcess&_m=checkout.review.placeOrder");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/review?_a=continueFromReviewToProcess&_m=checkout.review.placeOrder");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Review";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Review";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
@@ -285,37 +236,27 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=pollingProcess&_m=spinner");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx?_a=pollingProcess&_m=spinner");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Process";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
         if (curl)
         {
             setPostMethod(curl, "");
         }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
-    {
-        QString url = APPSTORE_HOST + QString("/shop/checkoutx?_a=pollingProcess&_m=spinner");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
-        if (curl)
-        {
-            setPostMethod(curl, "");
-        }
-    }
+    }    
     else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
     {
-        QString url = APPSTORE_HOST + QString("/shop/checkout/thankyou");
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkout/thankyou");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["Referer"] = "https://secure6.store.apple.com/jp/shop/checkout?_s=Process";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Process";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
     }
 
@@ -349,10 +290,13 @@ void GoodsBuyer::handleResponse(CURL* curl)
         qInfo("receive the response of request %d", userData->m_buyResult.m_currentStep);
     }
 
-    int64_t now = GetTickCount64();
-    int takeTime = int(now - userData->m_stepBeginTime);
-    userData->m_buyResult.m_takeTimes.append(takeTime);
-    userData->m_stepBeginTime = now;
+    if (userData->m_buyResult.m_currentStep <= STEP_REVIEW)
+    {
+        int64_t now = GetTickCount64();
+        int takeTime = int(now - userData->m_stepBeginTime);
+        userData->m_buyResult.m_takeTimes.append(takeTime);
+        userData->m_stepBeginTime = now;
+    }
 
     long statusCode = 0;
     QString responseData;
@@ -381,40 +325,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
 
     bool canNextStep = true;
-    if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_NOW)
-    {
-        canNextStep = handleCheckNowResponse(userData, responseData);
-        if (canNextStep)
-        {
-            userData->m_buyResult.m_currentStep = STEP_BIND_ACCOUNT;
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_BIND_ACCOUNT)
-    {
-        userData->m_buyParam.m_cookies.remove("myacinfo");
-        canNextStep = handleBindAccountResponse(userData, responseData);
-        if (canNextStep)
-        {
-            userData->m_buyResult.m_currentStep = STEP_CHECKOUT_START;
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT_START)
-    {
-        userData->m_buyResult.m_currentStep = STEP_CHECKOUT;
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_CHECKOUT)
-    {
-        canNextStep = handleCheckoutResponse(userData, responseData);
-        if (canNextStep)
-        {
-            userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_RETAIL;
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_RETAIL)
-    {
-        userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
+    if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
     {
         userData->m_buyResult.m_currentStep = STEP_PICKUP_CONTACT;
     }
@@ -432,7 +343,21 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
-        userData->m_buyResult.m_currentStep = STEP_QUERY_ORDER_NO;
+        if (!handleProcessResponse(userData, responseData))
+        {
+            userData->m_buyResult.m_currentStep = STEP_PROCESS;
+        }
+        else
+        {
+            if (userData->m_buyResult.m_success)
+            {
+                userData->m_buyResult.m_currentStep = STEP_QUERY_ORDER_NO;
+            }
+            else
+            {
+                canNextStep = false;
+            }
+        }
     }
     else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
     {
@@ -461,76 +386,35 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
 }
 
-bool GoodsBuyer::handleCheckNowResponse(BuyUserData* userData, QString& responseData)
+bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseData)
 {
+    if (responseData.indexOf("thankyou") >= 0)
+    {
+        userData->m_buyResult.m_success = true;
+        QString log = QString::fromWCharArray(L"账号(%1)下单成功")
+                .arg(userData->m_buyResult.m_account);
+        emit printLog(log);
+        return true;
+    }
+
     QByteArray jsonData = responseData.toUtf8();
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
     if (jsonDocument.isNull() || jsonDocument.isEmpty())
     {
-        qCritical("failed to parse json, data is %s", responseData.toStdString().c_str());
         return false;
     }
 
     QJsonObject root = jsonDocument.object();
-    if (root.contains("head") && root["head"].toObject().contains("data") &&
-            root["head"].toObject()["data"].toObject().contains("url"))
+    if (root.contains("body") && root["body"].toObject().contains("meta") &&
+            root["body"].toObject()["meta"].toObject().contains("page") &&
+            root["body"].toObject()["meta"].toObject()["page"].toObject().contains("title"))
     {
-        QString urlstring = root["head"].toObject()["data"].toObject()["url"].toString();
-        QUrl url(urlstring);
-        QUrlQuery urlQuery(url.query());
-        QString ssi = urlQuery.queryItemValue("ssi");
-        if (!ssi.isEmpty())
-        {
-            userData->m_ssi = ssi;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool GoodsBuyer::handleBindAccountResponse(BuyUserData* userData, QString& responseData)
-{
-    QByteArray jsonData = responseData.toUtf8();
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
-    if (jsonDocument.isNull() || jsonDocument.isEmpty())
-    {
-        qCritical("failed to parse json, data is %s", responseData.toStdString().c_str());
-        return false;
-    }
-
-    QJsonObject root = jsonDocument.object();
-    if (root.contains("head") && root["head"].toObject().contains("data") &&
-            root["head"].toObject()["data"].toObject().contains("args") &&
-            root["head"].toObject()["data"].toObject()["args"].toObject().contains("pltn"))
-    {
-        QString pltn = root["head"].toObject()["data"].toObject()["args"].toObject()["pltn"].toString();
-        if (!pltn.isEmpty())
-        {
-            userData->m_pltn = pltn;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool GoodsBuyer::handleCheckoutResponse(BuyUserData* userData, QString& responseData)
-{
-    int begin = responseData.indexOf("x-aos-stk\":");
-    if (begin >= 0)
-    {
-        begin = responseData.indexOf('"', begin + strlen("x-aos-stk\":"));
-        if (begin > 0)
-        {
-            int end = responseData.indexOf('"', begin + 1);
-            QString xAosStk = responseData.mid(begin + 1, end - begin -1);
-            if (!xAosStk.isEmpty())
-            {
-                userData->m_buyParam.m_xAosStk = xAosStk;
-                return true;
-            }
-        }
+        QString title = root["body"].toObject()["meta"].toObject()["page"].toObject()["title"].toString();
+        userData->m_buyResult.m_failReason = title;
+        QString log = QString::fromWCharArray(L"账号(%1)下单失败")
+                .arg(userData->m_buyResult.m_account);
+        emit printLog(log);
+        return true;
     }
 
     return false;
@@ -549,6 +433,9 @@ bool GoodsBuyer::handleQueryOrderResponse(BuyUserData* userData, QString& data)
             if (!orderNumber.isEmpty())
             {
                 userData->m_buyResult.m_orderNo = orderNumber;
+                QString log = QString::fromWCharArray(L"账号(%1)订单号是%2")
+                        .arg(userData->m_buyResult.m_account, orderNumber);
+                emit printLog(log);
                 return true;
             }
         }
