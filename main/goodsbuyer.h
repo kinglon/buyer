@@ -7,17 +7,17 @@
 #include "datamodel.h"
 
 // 购买步骤
-#define STEP_CHECKOUT_NOW       1
-#define STEP_BIND_ACCOUNT       2
-#define STEP_CHECKOUT_START     3
-#define STEP_CHECKOUT           4
-#define STEP_FULFILLMENT_RETAIL 5
-#define STEP_FULFILLMENT_STORE  6
-#define STEP_PICKUP_CONTACT     7
-#define STEP_BILLING            8
-#define STEP_REVIEW             9
-#define STEP_PROCESS            10
-#define STEP_QUERY_ORDER_NO     11
+#define STEP_CHECKOUT_NOW       1   // 前往购买
+#define STEP_BIND_ACCOUNT       2   // 绑定账号
+#define STEP_CHECKOUT_START     3   // 开始购买1
+#define STEP_CHECKOUT           4   // 开始购买2
+#define STEP_FULFILLMENT_RETAIL 5   // 选择自提
+#define STEP_FULFILLMENT_STORE  6   // 选择店铺
+#define STEP_PICKUP_CONTACT     7   // 选择联系人
+#define STEP_BILLING            8   // 支付
+#define STEP_REVIEW             9   // 确认订单
+#define STEP_PROCESS            10  // 处理订单
+#define STEP_QUERY_ORDER_NO     11  // 查询订单号
 
 class BuyParam
 {

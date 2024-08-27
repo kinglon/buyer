@@ -1,21 +1,29 @@
 import sys
 import os
 import datetime
+import threading
 
 
 class PrintStream:
+    lock = threading.Lock()
+
     def __init__(self, streams):
         self.streams = streams
 
     def write(self, data):
+        PrintStream.lock.acquire()
+
         for stream in self.streams:
             if data == '\n':
                 stream.write(data)
             else:
                 current_time = datetime.datetime.now()
-                formatted_time = current_time.strftime("[%Y-%m-%d %H:%M:%S] ")
-                stream.write(formatted_time + data)
+                formatted_time = current_time.strftime("[%Y-%m-%d %H:%M:%S]")
+                thread_id = '[{}]'.format(threading.current_thread().ident)
+                stream.write(formatted_time + thread_id + ' ' + data)
             stream.flush()
+
+        PrintStream.lock.release()
 
     def flush(self):
         for stream in self.streams:
