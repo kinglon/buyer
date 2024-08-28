@@ -36,7 +36,10 @@ void GoodsBuyer::run()
         userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
         userData->m_buyResult.m_localIp = m_localIps[i%m_localIps.size()];
         userData->m_buyParam = m_buyParams[i];
-        userData->m_buyResult.m_takeTimes.append(GetTickCount64()-userData->m_buyParam.m_beginBuyTime);
+        userData->m_buyResult.m_takeTimes.append(beginTime-userData->m_buyParam.m_beginBuyTime);
+        userData->m_buyResult.m_beginBuyDateTime = QDateTime::currentDateTime();
+        userData->m_buyResult.m_addCartProxy = m_buyParams[i].m_addCardProxy;
+        userData->m_buyResult.m_buyShopName = m_buyParams[i].m_buyingShop.m_name;
         userData->m_stepBeginTime = beginTime;
 
         CURL* curl = makeBuyingRequest(userData);
@@ -339,6 +342,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
+        qint64 totalTime = GetTickCount64() - userData->m_buyParam.m_beginBuyTime;
+        userData->m_buyResult.m_takeTimes.append(totalTime);
         userData->m_buyResult.m_currentStep = STEP_PROCESS;
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)

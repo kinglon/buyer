@@ -3,6 +3,7 @@
 
 #include <QThread>
 #include <QObject>
+#include <QDateTime>
 #include "httpthread.h"
 #include "datamodel.h"
 
@@ -32,8 +33,11 @@ public:
     // appstore_host
     QString m_appStoreHost;
 
-    // 开始购买时间, GetTickCount64返回的值
+    // 开始购买时间, GetTickCount64返回的值，统计耗时使用
     qint64 m_beginBuyTime = 0;
+
+    // 上号使用的代理IP
+    QString m_addCardProxy;
 };
 
 class BuyResult
@@ -59,6 +63,15 @@ public:
 
     // 下单失败的原因
     QString m_failReason;
+
+    // 开始购买时间，用于日期展示
+    QDateTime m_beginBuyDateTime;
+
+    // 上号的代理IP
+    QString m_addCartProxy;
+
+    // 购买店铺
+    QString m_buyShopName;
 
 public:
     QString getStepName() const

@@ -46,9 +46,13 @@ def add_cart(proxys, users, phone_model):
             apple_util = AppleUtil()
 
             # 设置代理IP
+            proxy_ip = ''
+            proxy_port = 0
             if len(proxys) > 0:
                 proxy_server = proxys[i % len(proxys)]
-                proxy_address = "socks5://{}:{}".format(proxy_server['ip'], proxy_server['port'])
+                proxy_ip = proxy_server['ip']
+                proxy_port = proxy_server['port']
+                proxy_address = "socks5://{}:{}".format(proxy_ip, proxy_port)
                 proxy = {"http": proxy_address, "https": proxy_address}
             else:
                 proxy = {"http": "", "https": ""}
@@ -121,8 +125,11 @@ def add_cart(proxys, users, phone_model):
                 'account': account,
                 'appstore_host': apple_util.appstore_host,
                 'x_aos_stk': x_aos_stk,
+                'proxy': '',
                 'cookies': apple_util.cookies
             }
+            if len(proxy_ip) > 0:
+                buy_param['proxy'] = proxy_ip + ':' + str(proxy_port)
             StateUtil.get().finish_task(True, buy_param, '')
             success = True
             break

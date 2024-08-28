@@ -346,6 +346,7 @@ bool PlanRunner::loadAddCartResult()
         BuyParam buyParam;
         buyParam.m_appStoreHost = buyParamJson.toObject()["appstore_host"].toString();
         buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
+        buyParam.m_addCardProxy = buyParamJson.toObject()["proxy"].toString();
 
         QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
         for (auto& cookieKey : cookieJson.keys())
@@ -552,6 +553,20 @@ void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResu
 
 bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
 {
+    PlanItem* plan = PlanManager::getInstance()->getPlanById(m_planId);
+    if (plan == nullptr)
+    {
+        qCritical("failed to find the plan: %s", m_planId.toStdString().c_str());
+        return false;
+    }
+
+    PhoneModel* phoneModel = SettingManager::getInstance()->getPhoneModelByCode(plan->m_phoneCode);
+    if (phoneModel == nullptr)
+    {
+        qCritical("failed to find the phone model: %s", plan->m_phoneCode.toStdString().c_str());
+        return false;
+    }
+
     std::wstring srcExcelFilePath = CImPath::GetConfPath() + L"\\购买结果.xlsx";
     std::wstring destExcelFilePath = m_planDataPath.toStdWString() + L"\\购买结果.xlsx";
     DeleteFile(destExcelFilePath.c_str());
@@ -570,23 +585,54 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
         return false;
     }
 
+    QString now = QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss");
     int row = 2;
     for (const auto& buyResult : buyResults)
     {
-        xlsx.write(row, 1, buyResult.m_account);
-        xlsx.write(row, 2, buyResult.m_orderNo);        
-        xlsx.write(row, 3, buyResult.getStepName());
-        QString takeTimes;
-        for (const auto& takeTime : buyResult.m_takeTimes)
+        static QString successMsg = QString::fromWCharArray(L"购买成功");
+        static QString failMsg = QString::fromWCharArray(L"购买失败");
+
+        int column = 1;
+        xlsx.write(row, column++, ""); // Robot_id
+        xlsx.write(row, column++, plan->m_name); // 任务名称
+        xlsx.write(row, column++, plan->m_count); // 数量
+        QString buyDateTime = buyResult.m_beginBuyDateTime.toString("yyyy/MM/dd hh:mm:ss");
+        xlsx.write(row, column++, buyDateTime); // 开抢时间
+        xlsx.write(row, column++, phoneModel->m_name); // iphonesku.spec_value
+        xlsx.write(row, column++, buyResult.m_addCartProxy); // 代理IP
+        xlsx.write(row, column++, buyResult.m_localIp); // 购买IP
+        xlsx.write(row, column++, buyResult.m_success?successMsg:failMsg); // 购物状态
+        xlsx.write(row, column++, buyResult.m_orderNo); // 订单号
+        xlsx.write(row, column++, ""); // 订单状态
+        xlsx.write(row, column++, ""); // 下单链接
+        xlsx.write(row, column++, "jp"); // 地区
+
+        QString orderInfo;
+        UserItem user = UserInfoManager::getInstance()->getUserByAccount(buyResult.m_account);
+        if (!user.m_accountName.isEmpty())
         {
-            if (!takeTimes.isEmpty())
-            {
-                takeTimes += ",";
-            }
-            takeTimes += QString::number(takeTime);
+            orderInfo = QString::fromWCharArray(L"电话：%1, 名字：%2， 地址：%3")
+                    .arg(user.m_telephone, user.m_lastName+user.m_firstName,
+                         user.m_state+user.m_city+user.m_street+user.m_street2);
         }
-        xlsx.write(row, 4, takeTimes);
-        xlsx.write(row, 5, buyResult.m_localIp);
+        xlsx.write(row, column++, orderInfo); // 下单信息
+        xlsx.write(row, column++, buyResult.m_account); // 下单帐号
+        xlsx.write(row, column++, buyResult.m_buyShopName); // 店铺
+        xlsx.write(row, column++, now); // 更新时间
+        xlsx.write(row, column++, user.m_email); // 邮箱
+        xlsx.write(row, column++, user.m_password); // 密码
+        xlsx.write(row, column++, buyResult.m_success?"":buyResult.m_failReason); // 失败原因
+
+        QString takeTime;
+        for (int i=0; i<buyResult.m_takeTimes.size(); i++)
+        {
+            if (!takeTime.isEmpty())
+            {
+                takeTime += ", ";
+            }
+            takeTime += QString::number(buyResult.m_takeTimes[i]);
+        }
+        xlsx.write(row, column++, takeTime); // 耗时
         row++;
     }
 
