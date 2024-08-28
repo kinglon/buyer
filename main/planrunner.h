@@ -47,7 +47,7 @@ private:
     void launchGoodsChecker();
 
     // 启动购买器
-    void launchGoodsBuyer();
+    bool launchGoodsBuyer();
 
     // 保存购买结果
     bool saveBuyingResult(const QVector<BuyResult>& buyResults);
@@ -86,6 +86,9 @@ private:
 
     // 购买结果列表
     QVector<BuyResult> m_buyResults;
+
+    // 用于定时购买倒计时
+    int m_elapseSeconds = 24*3600;
 };
 
 #endif // PLANRUNNER_H

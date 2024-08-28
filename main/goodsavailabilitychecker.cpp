@@ -116,6 +116,9 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
             break;
         }
 
+        int numfds = 0;
+        curl_multi_wait(multiHandle, NULL, 0, 100, &numfds);
+
         int stillRunning = 0;
         CURLMcode mc = curl_multi_perform(multiHandle, &stillRunning);
         if (mc)

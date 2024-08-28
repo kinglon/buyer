@@ -418,6 +418,18 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     }
 
     QJsonObject root = jsonDocument.object();
+    if (responseData.indexOf("sorry") >= 0 &&
+            root.contains("head") && root["head"].toObject().contains("data") &&
+            root["head"].toObject()["data"].toObject().contains("url"))
+    {
+        QString sorryUrl = root["head"].toObject()["data"].toObject()["url"].toString();
+        userData->m_buyResult.m_failReason = sorryUrl;
+        QString log = QString::fromWCharArray(L"账号(%1)下单失败")
+                .arg(userData->m_buyResult.m_account);
+        emit printLog(log);
+        return true;
+    }
+
     if (root.contains("body") && root["body"].toObject().contains("meta") &&
             root["body"].toObject()["meta"].toObject().contains("page") &&
             root["body"].toObject()["meta"].toObject()["page"].toObject().contains("title"))

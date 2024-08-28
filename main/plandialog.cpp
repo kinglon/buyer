@@ -184,7 +184,7 @@ void PlanDialog::onOkBtn()
     m_planItem.m_enableFixTimeBuy = ui->fixTimeCheckBox->isChecked();
     if (m_planItem.m_enableFixTimeBuy)
     {
-        m_planItem.m_fixBuyTime = ui->fixTimeEdit->time().secsTo(QTime(0,0));
+        m_planItem.m_fixBuyTime = QTime(0,0).secsTo(ui->fixTimeEdit->time());
     }
 
     if (m_planItem.m_buyingShops.empty())

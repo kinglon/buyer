@@ -72,6 +72,7 @@ bool PlanRunner::start()
 
     PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_ADD_CART);
     emit planStatusChange(m_planId);
+
     return true;
 }
 
@@ -189,8 +190,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
     if (SettingManager::getInstance()->m_useCacheAddCartResult)
     {
         if (!loadAddCartResult())
-        {
-            emit runFinish(m_planId, false);
+        {            
             return false;
         }
 
@@ -424,7 +424,7 @@ void PlanRunner::launchGoodsChecker()
                     break;
                 }
             }
-        }
+        }        
 
         QTimer* timer = new QTimer(this);
         timer->setInterval(20);
@@ -439,8 +439,16 @@ void PlanRunner::launchGoodsChecker()
                 return;
             }
 
-            QDateTime now = QDateTime::currentDateTime();
-            if (now.time().secsTo(QTime(0,0)) < fixBuyTime)
+            int now = QTime(0,0).secsTo(QDateTime::currentDateTime().time());
+            int tmpElapseSecs = fixBuyTime - now;
+            if (tmpElapseSecs>0 && m_elapseSeconds-tmpElapseSecs >= 10)
+            {
+                // 每10秒告知一次
+                emit printLog(QString::fromWCharArray(L"%1后开始购买").arg(tmpElapseSecs));
+                m_elapseSeconds = tmpElapseSecs;
+            }
+
+            if (now < fixBuyTime)
             {
                 return;
             }
@@ -500,7 +508,11 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
             m_buyParams[i].m_buyingShop = (*shops)[i%(*shops).size()];
         }
 
-        launchGoodsBuyer();
+        if (!launchGoodsBuyer())
+        {
+            printLog(QString::fromWCharArray(L"购物失败"));
+            emit runFinish(m_planId, false);
+        }
     }
     else
     {
@@ -511,28 +523,23 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
     delete shops;
 }
 
-void PlanRunner::launchGoodsBuyer()
+bool PlanRunner::launchGoodsBuyer()
 {
     PlanItem* plan = PlanManager::getInstance()->getPlanById(m_planId);
     if (plan == nullptr)
     {
-        return;
-    }
-
-    if (plan->m_count != m_buyParams.size())
-    {
-        qCritical("count is wrong");
-        return;
+        return false;
     }
 
     m_goodsBuyers.clear();
-    int countPerThread = plan->m_count / plan->m_threadCount;
+    int totalBuyCount = m_buyParams.size();
+    int countPerThread = totalBuyCount / plan->m_threadCount;
     for (int i=0; i<plan->m_threadCount; i++)
     {        
         int realCount = countPerThread;
         if (i == plan->m_threadCount - 1)
         {
-            realCount += plan->m_count % plan->m_threadCount;
+            realCount += totalBuyCount % plan->m_threadCount;
         }
 
         if (realCount == 0)
@@ -560,6 +567,8 @@ void PlanRunner::launchGoodsBuyer()
         buyer->start();
         m_goodsBuyers.append(buyer);
     }
+
+    return true;
 }
 
 void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults)
