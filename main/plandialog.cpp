@@ -89,6 +89,8 @@ void PlanDialog::updateCtrls()
 
    ui->countEdit->setText(QString::number(m_planItem.m_count));
 
+   ui->addCartThreadCountEdit->setText(QString::number(m_planItem.m_addCartThreadCount));
+
    ui->threadCountEdit->setText(QString::number(m_planItem.m_threadCount));
 
    if (m_planItem.m_enableFixTimeBuy)
@@ -166,10 +168,18 @@ void PlanDialog::onOkBtn()
     int threadCount = ui->threadCountEdit->text().toInt();
     if (threadCount <= 0)
     {
-        UiUtil::showTip(QString::fromWCharArray(L"线程数未填写"));
+        UiUtil::showTip(QString::fromWCharArray(L"购买线程数未填写"));
         return;
     }
     m_planItem.m_threadCount = threadCount;
+
+    int addCartThreadCount = ui->addCartThreadCountEdit->text().toInt();
+    if (addCartThreadCount <= 0)
+    {
+        UiUtil::showTip(QString::fromWCharArray(L"上号线程数未填写"));
+        return;
+    }
+    m_planItem.m_addCartThreadCount = addCartThreadCount;
 
     m_planItem.m_enableFixTimeBuy = ui->fixTimeCheckBox->isChecked();
     if (m_planItem.m_enableFixTimeBuy)

@@ -27,6 +27,9 @@ public:
 
     QString m_proxyRegion = "jp";
 
+    // 使用缓存的上号结果
+    bool m_useCacheAddCartResult = false;
+
     // 查询是否有货间隔，毫秒
     int m_queryGoodInterval = 100;
 

@@ -1,6 +1,7 @@
 import time
 from datamodel import DataModel
 from apple import AppleUtil
+from logutil import LogUtil
 
 
 def test_encrypt():
@@ -253,4 +254,5 @@ def main():
 
 
 if __name__ == '__main__':
+    LogUtil.enable()
     main()

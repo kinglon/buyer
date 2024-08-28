@@ -47,8 +47,12 @@ CURL* HttpThread::makeRequest(QString url,
 
     if (!proxyServer.m_ip.isEmpty())
     {
-        QString proxyServerHead = QString("socks5://%1:%2").arg(proxyServer.m_ip, proxyServer.m_port);
+        QString proxyServerHead = QString("socks5://%1:%2").arg(proxyServer.m_ip, QString::number(proxyServer.m_port));
         curl_easy_setopt(handle, CURLOPT_PROXY, proxyServerHead.toStdString().c_str());
+    }
+    else
+    {
+        curl_easy_setopt(handle, CURLOPT_PROXY, "");
     }
 
     if (!cookies.empty())
@@ -67,6 +71,8 @@ CURL* HttpThread::makeRequest(QString url,
 
     curl_easy_setopt(handle, CURLOPT_TIMEOUT, getTimeOutSeconds());
     curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, getTimeOutSeconds()*1000);
+    curl_easy_setopt(handle, CURLOPT_FRESH_CONNECT, 1L);
+    curl_easy_setopt(handle, CURLOPT_FORBID_REUSE, 1L);
     curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
     curl_easy_setopt(handle, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
     curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br, zstd");

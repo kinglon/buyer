@@ -5,6 +5,7 @@
     "proxy_region": "jp",
     "query_good_interval": 100,
     "stop_step": 100,
+    "use_cache_addcart": false,
     "network_request_interval": 2,
     "shop": [
         {

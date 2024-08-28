@@ -52,6 +52,9 @@ void GoodsBuyer::run()
 
     while (!m_requestStop)
     {        
+        int numfds = 0;
+        curl_multi_wait(m_multiHandle, NULL, 0, 100, &numfds);
+
         int stillRunning = 0;
         CURLMcode mc = curl_multi_perform(m_multiHandle, &stillRunning);
         if (mc)
@@ -63,7 +66,7 @@ void GoodsBuyer::run()
         int msgs_left = 0;
         CURLMsg *m = curl_multi_info_read(m_multiHandle, &msgs_left);
         if (m == nullptr)
-        {
+        {            
             continue;
         }
 
@@ -73,6 +76,11 @@ void GoodsBuyer::run()
         }
         else
         {
+            if (SettingManager::getInstance()->m_enableDebug)
+            {
+                qCritical("failed to send request, error is %d", m->data.result);
+            }
+
             BuyUserData* userData = nullptr;
             curl_easy_getinfo(m->easy_handle, CURLINFO_PRIVATE, &userData);
             if (userData)
@@ -269,7 +277,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
 
     curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyResult.m_localIp.toStdString().c_str());
-    curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);    
+    curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
 
     if (SettingManager::getInstance()->m_enableDebug)
     {

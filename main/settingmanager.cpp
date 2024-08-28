@@ -52,6 +52,10 @@ void SettingManager::load()
     m_proxyRegion = root["proxy_region"].toString();
     m_queryGoodInterval = root["query_good_interval"].toInt();
     m_stopStep = root["stop_step"].toInt();
+    if (root.contains("use_cache_addcart"))
+    {
+        m_useCacheAddCartResult = root["use_cache_addcart"].toBool();
+    }
 
     QJsonArray shops = root["shop"].toArray();
     for (auto shop : shops)

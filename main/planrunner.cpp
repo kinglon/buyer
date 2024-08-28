@@ -42,16 +42,19 @@ bool PlanRunner::start()
 
     // 重建计划数据目录
     m_planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
-    QDir folderDir(m_planDataPath);
-    if (folderDir.exists())
+    if (!SettingManager::getInstance()->m_useCacheAddCartResult)
     {
-        if (!folderDir.removeRecursively())
+        QDir folderDir(m_planDataPath);
+        if (folderDir.exists())
         {
-            printLog(QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开"));
-            return false;
+            if (!folderDir.removeRecursively())
+            {
+                printLog(QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开"));
+                return false;
+            }
         }
+        CreateDirectory(m_planDataPath.toStdWString().c_str(), nullptr);
     }
-    CreateDirectory(m_planDataPath.toStdWString().c_str(), nullptr);
 
     // 获取本地IP列表
     m_localIps = getLocalIps();
@@ -182,6 +185,22 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
 
 bool PlanRunner::launchAddCartRunner(PlanItem* plan)
 {
+    // 使用缓存上号数据，测试时使用
+    if (SettingManager::getInstance()->m_useCacheAddCartResult)
+    {
+        if (!loadAddCartResult())
+        {
+            emit runFinish(m_planId, false);
+            return false;
+        }
+
+        printLog(QString::fromWCharArray(L"上号成功"));
+        PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
+        emit planStatusChange(m_planId);
+        launchGoodsChecker();
+        return true;
+    }
+
     // 创建参数文件
     QString argsFilePath = m_planDataPath + "\\python_args.json";
     if (!createAddCardRunnerParamFile(plan, argsFilePath))
@@ -261,6 +280,12 @@ bool PlanRunner::queryAddCartRunnerStatus()
 {
     std::wstring planDataFilePath = m_planDataPath.toStdWString() + L"\\add_cart_progress.json";
     QFile file(QString::fromStdWString(planDataFilePath.c_str()));
+    if (!file.exists())
+    {
+        printLog(QString::fromWCharArray(L"上号中"));
+        return false;
+    }
+
     if (!file.open(QIODevice::ReadOnly))
     {
         return false;
@@ -301,7 +326,8 @@ bool PlanRunner::queryAddCartRunnerStatus()
         finishMessage = root["finish_message"].toString();
     }
 
-    printLog(QString::fromWCharArray(L"上号中：%1/%2").arg(successCount+failCount, totalCount));
+    printLog(QString::fromWCharArray(L"上号中：%1/%2")
+             .arg(QString::number(successCount+failCount), QString::number(totalCount)));
     if (!finish)
     {
         return false;
@@ -312,7 +338,8 @@ bool PlanRunner::queryAddCartRunnerStatus()
         printLog(finishMessage);
     }
 
-    printLog(QString::fromWCharArray(L"上号完成，总共%1，成功%2，失败%3").arg(totalCount, successCount, failCount));
+    printLog(QString::fromWCharArray(L"上号完成，总共%1，成功%2，失败%3")
+             .arg(QString::number(totalCount), QString::number(successCount), QString::number(failCount)));
     if (failCount > 0)
     {
         printLog(QString::fromWCharArray(L"上号失败的账号保存在：上号失败账号.txt"));
@@ -464,7 +491,7 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
 
     if (shops && !shops->empty())
     {
-        printLog(QString::fromWCharArray(L"查询到有货"));
+        printLog(QString::fromWCharArray(L"正在购物"));
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_BUYING);
         emit planStatusChange(m_planId);
 

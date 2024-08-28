@@ -96,7 +96,7 @@ public:
     // 上号线程数
     int m_addCartThreadCount = 1;
 
-    // 抢购线程数
+    // 购买线程数
     int m_threadCount = 1;
 
     // 是否开启定时购买
