@@ -34,12 +34,15 @@ void GoodsBuyer::run()
         BuyUserData* userData = new BuyUserData();
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
         userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
-        userData->m_buyResult.m_localIp = m_localIps[i%m_localIps.size()];
+        userData->m_buyResult.m_localIp = m_buyParams[i].m_localIp;
         userData->m_buyParam = m_buyParams[i];
         QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
         userData->m_buyResult.m_takeTimes.append(takeTime);
         userData->m_buyResult.m_beginBuyDateTime = QDateTime::currentDateTime();
-        userData->m_buyResult.m_addCartProxy = m_buyParams[i].m_addCardProxy;
+        if (!m_buyParams[i].m_proxyIp.isEmpty())
+        {
+            userData->m_buyResult.m_addCartProxy = m_buyParams[i].m_proxyIp+":"+QString::number(m_buyParams[i].m_proxyPort);
+        }
         userData->m_buyResult.m_buyShopName = m_buyParams[i].m_buyingShop.m_name;
         userData->m_stepBeginTime = beginTime;
 
@@ -139,6 +142,10 @@ QString GoodsBuyer::getBodyString(const QMap<QString, QString>& body)
 
 CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
 {
+    ProxyServer proxyServer;
+    proxyServer.m_ip = userData->m_buyParam.m_proxyIp;
+    proxyServer.m_port = userData->m_buyParam.m_proxyPort;
+
     QMap<QString, QString> headers;
     headers["origin"] = APPLE_HOST;
     headers["Referer"] = APPLE_HOST;
@@ -156,7 +163,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Fulfillment-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
             QString body = QString("checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL&checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=%1&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
@@ -174,7 +181,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=PickupContact-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
             QMap<QString, QString> body;
@@ -199,7 +206,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Billing-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
             QString creditCardPrefix;
@@ -240,7 +247,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Review";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
             setPostMethod(curl, "");
@@ -256,7 +263,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["X-Aos-Model-Page"] = "checkoutPage";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Process";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
             setPostMethod(curl, "");
@@ -269,7 +276,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["Referer"] = userData->m_buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Process";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, ProxyServer());
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
     }
 
     if (curl == nullptr)
@@ -277,7 +284,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         return nullptr;
     }
 
-    curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyResult.m_localIp.toStdString().c_str());
+    curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyParam.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
 
     if (SettingManager::getInstance()->m_enableDebug)

@@ -2,6 +2,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QNetworkInterface>
 #include "settingmanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
@@ -10,6 +11,31 @@ GoodsAvailabilityChecker::GoodsAvailabilityChecker(QObject *parent)
     : HttpThread{parent}
 {
 
+}
+
+QVector<QString> GoodsAvailabilityChecker::getLocalIps()
+{
+    QVector<QString> ipAddresses;
+    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface& networkInterface : interfaces)
+    {
+        // Skip loopback and inactive interfaces
+        if (networkInterface.flags().testFlag(QNetworkInterface::IsLoopBack) || !networkInterface.flags().testFlag(QNetworkInterface::IsUp))
+        {
+            continue;
+        }
+
+        QList<QNetworkAddressEntry> addressEntries = networkInterface.addressEntries();
+        for (const QNetworkAddressEntry& entry : addressEntries)
+        {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol)
+            {
+                ipAddresses.append(entry.ip().toString());
+            }
+        }
+    }
+
+    return ipAddresses;
 }
 
 void GoodsAvailabilityChecker::getProxyServer(QVector<ProxyServer>& proxyServers)
@@ -229,7 +255,10 @@ CURL* GoodsAvailabilityChecker::makeQueryRequest(QString postal)
         m_nextProxyIndex = (m_nextProxyIndex + 1) % m_proxyServers.size();
     }
 
-    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);    
+    CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);
+    curl_easy_setopt(request, CURLOPT_INTERFACE, m_localIps[m_nextLocalIpIndex].toStdString().c_str());
+    m_nextLocalIpIndex = (m_nextLocalIpIndex+1) % m_localIps.size();
+
     m_reqCount += 1;
     m_lastSendReqTimeMs = GetTickCount64();
     return request;
@@ -305,6 +334,15 @@ void GoodsAvailabilityChecker::run()
 
     m_reqIntervalMs = SettingManager::getInstance()->m_queryGoodInterval;
     m_maxReqCount = getTimeOutSeconds() * 1000 / m_reqIntervalMs;
+
+    // 获取本地IP列表
+    m_localIps = getLocalIps();
+    emit printLog(QString::fromWCharArray(L"本地IP数是：%1").arg(m_localIps.size()));
+    if (m_localIps.size() == 0)
+    {
+        emit checkFinish(nullptr);
+        return;
+    }
 
     // 获取代理IP池
     if (SettingManager::getInstance()->m_useProxy)

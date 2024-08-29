@@ -54,19 +54,11 @@ bool PlanRunner::start()
             }
         }
         CreateDirectory(m_planDataPath.toStdWString().c_str(), nullptr);
-    }
-
-    // 获取本地IP列表
-    m_localIps = getLocalIps();
-    qInfo("the number of the local ips is %d", m_localIps.size());
-    if (m_localIps.size() == 0)
-    {
-        printLog(QString::fromWCharArray(L"获取本地IP列表失败"));
-        return false;
-    }
+    }    
 
     if (!launchAddCartRunner(plan))
     {
+        printLog(QString::fromWCharArray(L"启动上号程序失败"));
         return false;
     }
 
@@ -94,31 +86,6 @@ void PlanRunner::printLog(const QString& content)
 {
     QString contentWithPrefix = "["+m_planName+"] "+content;
     emit log(contentWithPrefix);
-}
-
-QVector<QString> PlanRunner::getLocalIps()
-{
-    QVector<QString> ipAddresses;
-    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
-    for (const QNetworkInterface& networkInterface : interfaces)
-    {
-        // Skip loopback and inactive interfaces
-        if (networkInterface.flags().testFlag(QNetworkInterface::IsLoopBack) || !networkInterface.flags().testFlag(QNetworkInterface::IsUp))
-        {
-            continue;
-        }
-
-        QList<QNetworkAddressEntry> addressEntries = networkInterface.addressEntries();
-        for (const QNetworkAddressEntry& entry : addressEntries)
-        {
-            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol)
-            {
-                ipAddresses.append(entry.ip().toString());
-            }
-        }
-    }
-
-    return ipAddresses;
 }
 
 bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFilePath)
@@ -223,8 +190,8 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
     si.wShowWindow = SW_HIDE;
 
     std::wstring strScriptPath = CImPath::GetSoftInstallPath() + L"python\\addcart.py";
-    wchar_t command[MAX_PATH];
-    _snwprintf_s(command, MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), m_planDataPath.toStdWString().c_str());
+    wchar_t command[3*MAX_PATH];
+    _snwprintf_s(command, 3*MAX_PATH, L"python.exe \"%s\" \"%s\" ", strScriptPath.c_str(), m_planDataPath.toStdWString().c_str());
     if (!CreateProcess(NULL, (LPWSTR)command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
     {
         qCritical("failed to create python process, error is %d", GetLastError());
@@ -373,7 +340,9 @@ bool PlanRunner::loadAddCartResult()
         BuyParam buyParam;
         buyParam.m_appStoreHost = buyParamJson.toObject()["appstore_host"].toString();
         buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
-        buyParam.m_addCardProxy = buyParamJson.toObject()["proxy"].toString();
+        buyParam.m_proxyIp = buyParamJson.toObject()["proxy_ip"].toString();
+        buyParam.m_proxyPort = buyParamJson.toObject()["proxy_port"].toInt();
+        buyParam.m_localIp = buyParamJson.toObject()["local_ip"].toInt();
 
         QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
         for (auto& cookieKey : cookieJson.keys())
@@ -548,18 +517,15 @@ bool PlanRunner::launchGoodsBuyer()
         }
 
         qint64 now = GetTickCount64();
-        QVector<QString> localIps;
         QVector<BuyParam> buyParams;
         for (int j=0; j<realCount; j++)
         {
             int index = i*countPerThread+j;
-            localIps.push_back(m_localIps[index % m_localIps.size()]);
             m_buyParams[index].m_beginBuyTime = now;
             buyParams.push_back(m_buyParams[index]);
         }
 
         GoodsBuyer* buyer = new GoodsBuyer();
-        buyer->setLocalIps(localIps);
         buyer->setParams(buyParams);
         connect(buyer, &GoodsBuyer::buyFinish, this, &PlanRunner::onGoodsBuyFinish);
         connect(buyer, &GoodsBuyer::printLog, this, &PlanRunner::printLog);

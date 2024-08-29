@@ -16,7 +16,7 @@ def get_proxy_server_list(proxy_region):
     no_proxy_server = {"http": "", "https": ""}
     error = (False, [], '')
     try:
-        url = ("http://api.proxy.ipidea.io/getBalanceProxyIp?num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
+        url = ("http://api.proxy.ipidea.io/getBalanceProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
                .format(proxy_region))
         response = requests.get(url, proxies=no_proxy_server, timeout=10)
         if not response.ok:
@@ -125,11 +125,13 @@ def add_cart(proxys, users, phone_model):
                 'account': account,
                 'appstore_host': apple_util.appstore_host,
                 'x_aos_stk': x_aos_stk,
-                'proxy': '',
+                'proxy_ip': '',
+                "proxy_port": 0,
                 'cookies': apple_util.cookies
             }
             if len(proxy_ip) > 0:
-                buy_param['proxy'] = proxy_ip + ':' + str(proxy_port)
+                buy_param['proxy_ip'] = proxy_ip
+                buy_param['proxy_port'] = proxy_port
             StateUtil.get().finish_task(True, buy_param, '')
             success = True
             break

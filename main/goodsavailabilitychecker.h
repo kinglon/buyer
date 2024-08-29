@@ -32,6 +32,9 @@ protected:
     QMap<QString,QString> getCommonHeaders() override;
 
 private:
+    // 获取本地IP列表
+    QVector<QString> getLocalIps();
+
     void getProxyServer(QVector<ProxyServer>& proxyServers);
 
     void parseProxyServerData(const QString& data, QVector<ProxyServer>& proxyServers);
@@ -72,11 +75,17 @@ private:
     // 查询机型码
     QString m_phoneCode;
 
+    // 本地IP列表
+    QVector<QString> m_localIps;
+
     // 可用代理IP池
     QVector<ProxyServer> m_proxyServers;
 
     // 轮询使用代理IP池，标识下一个使用的IP索引
     int m_nextProxyIndex = 0;
+
+    // 轮询使用本地IP，标识下一个使用的IP索引
+    int m_nextLocalIpIndex = 0;
 };
 
 #endif // GOODSAVAILABILITYCHECKER_H

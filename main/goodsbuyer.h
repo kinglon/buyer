@@ -36,8 +36,12 @@ public:
     // 开始购买时间, GetTickCount64返回的值，统计耗时使用
     qint64 m_beginBuyTime = 0;
 
-    // 上号使用的代理IP
-    QString m_addCardProxy;
+    // 上号使用的代理IP和端口
+    QString m_proxyIp;
+    int m_proxyPort = 0;
+
+    // 使用的本地IP
+    QString m_localIp;
 };
 
 class BuyResult
@@ -136,9 +140,7 @@ public:
 public:
     void requestStop() { m_requestStop = true; }
 
-    void setParams(const QVector<BuyParam>& params) { m_buyParams = params; }
-
-    void setLocalIps(const QVector<QString>& localIps) { m_localIps = localIps; }
+    void setParams(const QVector<BuyParam>& params) { m_buyParams = params; }    
 
 protected:
     void run() override;
@@ -168,9 +170,6 @@ private:
     bool m_requestStop = false;
 
     CURLM* m_multiHandle = nullptr;
-
-    // 本地IP列表
-    QVector<QString> m_localIps;
 
     QVector<BuyParam> m_buyParams;
 

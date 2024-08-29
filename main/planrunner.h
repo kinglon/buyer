@@ -28,9 +28,6 @@ signals:
     void runFinish(QString planId, bool success);
 
 private:
-    // 获取本地IP列表
-    QVector<QString> getLocalIps();
-
     // 创建上货Python程序的参数文件
     bool createAddCardRunnerParamFile(PlanItem* plan, QString paramFilePath);
 
@@ -76,10 +73,7 @@ private:
 
     GoodsAvailabilityChecker* m_goodsChecker = nullptr;
 
-    QVector<GoodsBuyer*> m_goodsBuyers;
-
-    // 本地IP列表
-    QVector<QString> m_localIps;
+    QVector<GoodsBuyer*> m_goodsBuyers;    
 
     // 购买参数列表
     QVector<BuyParam> m_buyParams;
