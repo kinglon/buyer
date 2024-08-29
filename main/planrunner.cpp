@@ -606,7 +606,8 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
         xlsx.write(row, column++, buyResult.m_success?successMsg:failMsg); // 购物状态
         xlsx.write(row, column++, buyResult.m_orderNo); // 订单号
         xlsx.write(row, column++, ""); // 订单状态
-        xlsx.write(row, column++, ""); // 下单链接
+        QString orderLink = QString("https://www.apple.com/xc/jp/vieworder/%1/%2").arg(buyResult.m_orderNo, buyResult.m_account);
+        xlsx.write(row, column++, orderLink); // 下单链接
         xlsx.write(row, column++, "jp"); // 地区
 
         QString orderInfo;
