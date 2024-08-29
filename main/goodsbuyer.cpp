@@ -36,7 +36,8 @@ void GoodsBuyer::run()
         userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
         userData->m_buyResult.m_localIp = m_localIps[i%m_localIps.size()];
         userData->m_buyParam = m_buyParams[i];
-        userData->m_buyResult.m_takeTimes.append(beginTime-userData->m_buyParam.m_beginBuyTime);
+        QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
+        userData->m_buyResult.m_takeTimes.append(takeTime);
         userData->m_buyResult.m_beginBuyDateTime = QDateTime::currentDateTime();
         userData->m_buyResult.m_addCartProxy = m_buyParams[i].m_addCardProxy;
         userData->m_buyResult.m_buyShopName = m_buyParams[i].m_buyingShop.m_name;
@@ -305,7 +306,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     {
         int64_t now = GetTickCount64();
         int takeTime = int(now - userData->m_stepBeginTime);
-        userData->m_buyResult.m_takeTimes.append(takeTime);
+        QString takeTimeString = QString::fromWCharArray(L"%1%2").arg(userData->m_buyResult.getStepName(), QString::number(takeTime));
+        userData->m_buyResult.m_takeTimes.append(takeTimeString);
         userData->m_stepBeginTime = now;
     }
 
@@ -351,7 +353,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
         qint64 totalTime = GetTickCount64() - userData->m_buyParam.m_beginBuyTime;
-        userData->m_buyResult.m_takeTimes.append(totalTime);
+        QString takeTime = QString::fromWCharArray(L"总%1").arg(totalTime);
+        userData->m_buyResult.m_takeTimes.append(takeTime);
         userData->m_buyResult.m_currentStep = STEP_PROCESS;
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
@@ -424,8 +427,8 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     {
         QString sorryUrl = root["head"].toObject()["data"].toObject()["url"].toString();
         userData->m_buyResult.m_failReason = sorryUrl;
-        QString log = QString::fromWCharArray(L"账号(%1)下单失败")
-                .arg(userData->m_buyResult.m_account);
+        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                .arg(userData->m_buyResult.m_account, sorryUrl);
         emit printLog(log);
         return true;
     }
@@ -436,8 +439,8 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     {
         QString title = root["body"].toObject()["meta"].toObject()["page"].toObject()["title"].toString();
         userData->m_buyResult.m_failReason = title;
-        QString log = QString::fromWCharArray(L"账号(%1)下单失败")
-                .arg(userData->m_buyResult.m_account);
+        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                .arg(userData->m_buyResult.m_account, title);
         emit printLog(log);
         return true;
     }

@@ -53,7 +53,7 @@ public:
     int m_currentStep = STEP_FULFILLMENT_STORE;
 
     // 每个步骤的耗时，毫秒数
-    QVector<int> m_takeTimes;
+    QVector<QString> m_takeTimes;
 
     // 发送IP地址
     QString m_localIp;

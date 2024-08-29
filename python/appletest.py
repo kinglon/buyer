@@ -145,16 +145,16 @@ def test_v2():
     apple_util = AppleUtil()
 
     data_model = DataModel()
-    data_model.account = '158653658@163.com'
+    data_model.account = 'm16670802@163.com'
     data_model.password = 'Cxh520941'
     data_model.store = 'R079'
     data_model.first_name = 'Jeric'
     data_model.last_name = 'Ye'
     data_model.telephone = '08054897787'
     data_model.email = '415571971@qq.com'
-    data_model.credit_card_no = '5353073996693999'
+    data_model.credit_card_no = '5478825275225078'
     data_model.expired_date = '03/25'
-    data_model.cvv = '108'
+    data_model.cvv = '026'
     data_model.postal_code = '104-8125'
     data_model.state = '北海道'
     data_model.city = 'Fuzhou'

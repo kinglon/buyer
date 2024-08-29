@@ -666,7 +666,7 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
             {
                 takeTime += ", ";
             }
-            takeTime += QString::number(buyResult.m_takeTimes[i]);
+            takeTime += buyResult.m_takeTimes[i];
         }
         xlsx.write(row, column++, takeTime); // 耗时
         row++;
