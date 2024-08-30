@@ -6,8 +6,14 @@ class DataModel:
         # 密码
         self.password = ''
 
-        # 自提店铺
+        # 自提店铺ID
         self.store = ''
+
+        # 店铺名字
+        self.store_name = ''
+
+        # 店铺的邮编
+        self.store_postal_code = ''
 
         # 姓
         self.first_name = ''
