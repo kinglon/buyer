@@ -20,6 +20,10 @@ class AppleUtil:
         self.cookies = {}
         self.debug_cookie = ''
         self.timeout = 10
+        self.session = requests.Session()
+
+        # 最后一个响应
+        self.last_response = None
 
     # 保存响应内容，调试使用
     @staticmethod
@@ -112,13 +116,13 @@ class AppleUtil:
                     "protocols": ["s2k"]
                     }
             body = json.dumps(body)
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("登录初始化失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("登录初始化失败，错误是：{}".format(self.last_response))
                 return None
             else:
-                self.cookies.update(response.cookies.get_dict())
-                data = response.content.decode('utf-8')
+                self.cookies.update(self.last_response.cookies.get_dict())
+                data = self.last_response.content.decode('utf-8')
                 data = json.loads(data)
                 return data
         except Exception as e:
@@ -143,12 +147,12 @@ class AppleUtil:
                     "rememberMe": False
                     }
             body = json.dumps(body)
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("登录认证失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("登录认证失败，错误是：{}".format(self.last_response))
                 return False
             else:
-                cookies = response.cookies.get_dict()
+                cookies = self.last_response.cookies.get_dict()
                 if 'myacinfo' in cookies:
                     self.cookies.update(cookies)
                     return True
@@ -184,12 +188,12 @@ class AppleUtil:
             # 获取atb token
             url = self.apple_host + '/shop/beacon/atb'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("添加商品到购物包初始化失败，错误是：{}".format(response))
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("添加商品到购物包初始化失败，错误是：{}".format(self.last_response))
                 return False
             else:
-                cookies = response.cookies.get_dict()
+                cookies = self.last_response.cookies.get_dict()
                 if 'as_atb' not in cookies:
                     print("添加商品到购物包初始化失败，错误是：没有as_atb cookie")
                     return False
@@ -202,13 +206,13 @@ class AppleUtil:
             url = (self.apple_host + '/shop/buy-iphone/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
                    .format(model, product, atbtoken))
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("添加商品到购物包失败，错误是：{}".format(response))
+            self.last_response = self.session.get(url, headers=headers, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("添加商品到购物包失败，错误是：{}".format(self.last_response))
                 return False
             else:
-                if 'Location' in response.headers and response.headers['Location'].find('step=attach') > 0:
-                    self.cookies.update(response.cookies.get_dict())
+                if 'Location' in self.last_response.headers and self.last_response.headers['Location'].find('step=attach') > 0:
+                    self.cookies.update(self.last_response.cookies.get_dict())
                     return True
                 else:
                     print("添加商品到购物包失败，错误是：没有Location头部信息")
@@ -225,12 +229,12 @@ class AppleUtil:
             url = (self.apple_host + '/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0={}/A&location={}'
                    .format(product, location))
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("查询店铺是否有货失败，错误是：".format(response))
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("查询店铺是否有货失败，错误是：".format(self.last_response))
                 return False
             else:
-                data = response.content.decode('utf-8')
+                data = self.last_response.content.decode('utf-8')
                 root = json.loads(data)
                 stores = root['body']['content']['pickupMessage']['stores']
                 for store in stores:
@@ -247,13 +251,13 @@ class AppleUtil:
         try:
             url = self.apple_host + '/shop/bag'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("打开购物包失败，错误是：{}".format(response))
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("打开购物包失败，错误是：{}".format(self.last_response))
                 return None
             else:
-                self.cookies.update(response.cookies.get_dict())
-                data = response.content.decode('utf-8')
+                self.cookies.update(self.last_response.cookies.get_dict())
+                data = self.last_response.content.decode('utf-8')
                 if data.find('/jp/shop/bagx/checkout_now?_a=checkout&_m=shoppingCart.actions') == -1:
                     print("打开购物包失败，错误是：未找到checkout url")
                     return None
@@ -282,17 +286,17 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'cart'
             body = 'shoppingCart.recommendations.recommendedItem.part=&shoppingCart.bagSavedItems.part=&shoppingCart.bagSavedItems.listId=&shoppingCart.bagSavedItems.childPart=&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.isIntentToGift=false&shoppingCart.items.item-47e7a306-7cfd-4722-b440-1b6ba32b1647.itemQuantity.quantity=1&shoppingCart.locationConsent.locationConsent=false&shoppingCart.summary.promoCode.promoCode=&shoppingCart.actions.fcscounter=&shoppingCart.actions.fcsdata='
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("进入订购流程失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("进入订购流程失败，错误是：{}".format(self.last_response))
                 return None
             else:
-                data = response.content.decode('utf-8')
+                data = self.last_response.content.decode('utf-8')
                 root = json.loads(data)
                 url = root['head']['data']['url']
                 self.appstore_host = url[0: url.index('jp')+2]
                 if url.find('ssi=') != -1:
-                    self.cookies.update(response.cookies.get_dict())
+                    self.cookies.update(self.last_response.cookies.get_dict())
                     parsed_url = urllib.parse.urlparse(url)
                     ssi = urllib.parse.parse_qs(parsed_url.query)['ssi'][0]
                     return ssi
@@ -314,14 +318,14 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'signInPage'
             body = 'deviceID=TF1%3B015%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3BMozilla%3BNetscape%3B5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3B20030107%3Bundefined%3Btrue%3B%3Btrue%3BWin32%3Bundefined%3BMozilla%2F5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit%2F537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome%2F122.0.0.0%2520Safari%2F537.36%3Bzh-CN%3Bundefined%3Bsecure6.store.apple.com%3Bundefined%3Bundefined%3Bundefined%3Bundefined%3Bfalse%3Bfalse%3B1719370448096%3B8%3B2005%2F6%2F7%252021%253A33%253A44%3B1366%3B768%3B%3B%3B%3B%3B%3B%3B%3B-480%3B-480%3B2024%2F6%2F26%252010%253A54%253A08%3B24%3B1366%3B728%3B0%3B0%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B%3B25%3B&grantCode='
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("绑定账号失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("绑定账号失败，错误是：{}".format(self.last_response))
                 return None
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             del self.cookies['myacinfo']
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             pltn = root['head']['data']['args']['pltn']
             return pltn
@@ -336,12 +340,12 @@ class AppleUtil:
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             body = 'pltn={}'.format(pltn)
-            response = requests.post(url, headers=headers, data=body, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("初始化下单失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("初始化下单失败，错误是：{}".format(self.last_response))
                 return False
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("初始化下单失败，错误是：{}".format(e))
@@ -353,14 +357,14 @@ class AppleUtil:
         try:
             url = self.appstore_host + '/shop/checkout'
             headers = self.get_common_request_header()
-            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("进入下单页面失败，错误是：{}".format(response))
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("进入下单页面失败，错误是：{}".format(self.last_response))
                 return None
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
 
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             begin = data.find('x-aos-stk":')
             if begin > 0:
                 begin = data.find('"', begin + len('x-aos-stk":'))
@@ -385,16 +389,16 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
             body = 'checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL'
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("选择自提失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("选择自提失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             json.loads(data)
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("选择自提失败，错误是：{}".format(e))
@@ -412,17 +416,17 @@ class AppleUtil:
             headers['X-Aos-Model-Page'] = 'checkoutPage'
             body = ('checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL&checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore={}&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput={}'
                     .format(data_model.store, data_model.postal_code))
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("选择自提失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("选择自提失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("选择自提失败，错误是：{}".format(e))
@@ -450,17 +454,17 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("选择联系人失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("选择联系人失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("选择联系人失败，错误是：{}".format(e))
@@ -486,17 +490,17 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("选择使用信用卡支付失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("选择使用信用卡支付失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("选择使用信用卡支付失败，错误是：{}".format(e))
@@ -529,17 +533,17 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("检测信用卡类型失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("检测信用卡类型失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("检测信用卡类型失败，错误是：{}".format(e))
@@ -572,17 +576,17 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("输入信用卡信息失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("输入信用卡信息失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("输入信用卡信息失败，错误是：{}".format(e))
@@ -619,17 +623,17 @@ class AppleUtil:
             }
             body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}' for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("输入账单地址失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("输入账单地址失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("输入账单地址失败，错误是：{}".format(e))
@@ -676,17 +680,17 @@ class AppleUtil:
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            response = requests.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("支付失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("支付失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("支付失败，错误是：{}".format(e))
@@ -702,17 +706,17 @@ class AppleUtil:
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
-            response = requests.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("确认下单失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("确认下单失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             print('页面标题：{}'.format(root['body']['meta']['page']['title']))
 
-            self.cookies.update(response.cookies.get_dict())
+            self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
             print("确认下单失败，错误是：{}".format(e))
@@ -729,20 +733,20 @@ class AppleUtil:
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
-            response = requests.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("查询处理结果失败，错误是：{}".format(response))
+            self.last_response = self.session.post(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("查询处理结果失败，错误是：{}".format(self.last_response))
                 return processing
 
             # 失败的话不是Json串，抛异常表示返回失败
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
             if 'meta' in root['body'] and 'page' in root['body']['meta']:
                 print('下单失败，进入的页面标题：{}'.format(root['body']['meta']['page']['title']))
                 return True, False
             elif data.lower().find('thankyou') >= 0:
                 print('下单成功')
-                self.cookies.update(response.cookies.get_dict())
+                self.cookies.update(self.last_response.cookies.get_dict())
                 return True, True
             else:
                 return processing
@@ -757,12 +761,12 @@ class AppleUtil:
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Process'
-            response = requests.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
-            if not response.ok:
-                print("查询订单号失败，错误是：{}".format(response))
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("查询订单号失败，错误是：{}".format(self.last_response))
                 return None
 
-            data = response.content.decode('utf-8')
+            data = self.last_response.content.decode('utf-8')
             begin = data.find('"orderNumber":')
             if begin > 0:
                 begin = data.find('"', begin + len('"orderNumber":'))

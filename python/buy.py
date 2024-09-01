@@ -1,16 +1,16 @@
 import os.path
 import sys
 import time
-import traceback
 from logutil import LogUtil
 from apple import AppleUtil
 import requests
 import json
-from stateutil import StateUtil
 import threading
-from setting import Setting
 from datetime import datetime
 from datamodel import DataModel
+import shutil
+import openpyxl
+
 
 # 工作目录
 g_work_path = ''
@@ -18,14 +18,20 @@ g_work_path = ''
 # 购买结果列表
 g_buy_results = []
 
+# 当前计划
+g_current_plan = {}
+
+# 购买手机型号
+g_buy_phone_model = {}
+
 # 同步锁
 g_lock = threading.Lock()
 
 
 class BuyResult:
-    def __int__(self):
-        # 购买信息
-        self.buy_info = None
+    def __init__(self):
+        # 购买参数，DataModel
+        self.buy_param = DataModel()
 
         # 标志是否成功下单
         self.success = False
@@ -42,8 +48,19 @@ class BuyResult:
         # 上号的代理地址
         self.proxy_server = ''
 
-        # 购买店铺名字
-        self.buy_shop_name = ''
+
+class ProxyPool:
+    def __init__(self):
+        self.proxys = []
+        self.next_proxy_index = 0
+
+    def get_next_proxy(self):
+        proxy_ip = self.proxys[self.next_proxy_index]['ip']
+        proxy_port = self.proxys[self.next_proxy_index]['port']
+        proxy_address = "socks5://{}:{}".format(proxy_ip, proxy_port)
+        proxy = {"http": proxy_address, "https": proxy_address}
+        self.next_proxy_index = (self.next_proxy_index + 1) % len(self.proxys)
+        return proxy
 
 
 # 获取代理IP列表，返回（success, proxy ips, message）
@@ -69,114 +86,179 @@ def get_proxy_server_list(proxy_region):
         return error
 
 
+def need_change_proxy(response):
+    if response is None:
+        return False
+
+    if response.status_code == 403 or response.status_code == 503:
+        return True
+
+    return False
+
+
 def buy(proxys, datamodel):
-    for i in range(len(users)):
-        account = users[i]['account']
-        password = users[i]['password']
+    try:
+        buy_result = BuyResult()
+        buy_result.begin_buy_time = datetime.now().timestamp()
+        buy_result.buy_param = datamodel
 
-        success = False
-        error_message = ''
-        for j in range(3):
-            print('开始上号，账号是：{}'.format(account))
-            apple_util = AppleUtil()
+        print('账号({})开始购买'.format(datamodel.account))
+        apple_util = AppleUtil()
 
-            # 设置代理IP
-            proxy_ip = ''
-            proxy_port = 0
-            if len(proxys) > 0:
-                proxy_server = proxys[i % len(proxys)]
-                proxy_ip = proxy_server['ip']
-                proxy_port = proxy_server['port']
-                proxy_address = "socks5://{}:{}".format(proxy_ip, proxy_port)
-                proxy = {"http": proxy_address, "https": proxy_address}
-            else:
-                proxy = {"http": "", "https": ""}
-            apple_util.proxies = proxy
-            print('使用代理IP：{}'.format(proxy))
+        proxy_pool = ProxyPool()
+        proxy_pool.proxys = proxys
+        apple_util.proxies = proxy_pool.get_next_proxy()
+        buy_result.proxy_server = apple_util.proxies
+        print('使用代理：{}'.format(buy_result.proxy_server))
 
-            # 添加商品
-            model = phone_model['model']
-            code = phone_model['phone_code']
+        # 添加商品
+        model = g_buy_phone_model['model']
+        code = g_buy_phone_model['code']
+        while True:
             print('加入购物包: {}, {}'.format(model, code))
-            if not apple_util.add_cart(model, code):
-                error_message = '加入购物包失败: {}, {}'.format(model, code)
-                continue
-            time.sleep(Setting.get().request_interval)
+            if apple_util.add_cart(model, code):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 打开购物车
+        # 打开购物车
+        while True:
             print('打开购物包')
             x_aos_stk = apple_util.open_cart()
-            if x_aos_stk is None:
-                error_message = '打开购物包失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if x_aos_stk:
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 进入购物流程
+        # 进入购物流程
+        while True:
             print('进入购物流程')
             ssi = apple_util.checkout_now(x_aos_stk)
-            if ssi is None:
-                error_message = '进入购物流程失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if ssi:
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 登录
+        # 登录
+        while True:
             print('登录账号')
-            if not apple_util.login(account, password):
-                error_message = '登录账号失败：{}, {}'.format(account, password)
-                continue
-            time.sleep(Setting.get().request_interval)
+            if apple_util.login(datamodel.account, datamodel.password):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 绑定账号
+        # 绑定账号
+        while True:
             print('绑定账号')
             pltn = apple_util.bind_account(x_aos_stk, ssi)
-            if pltn is None:
-                error_message = '绑定账号失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if pltn:
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 开始下单
+        # 开始下单
+        while True:
             print('开始下单')
-            if not apple_util.checkout_start(pltn):
-                error_message = '开始下单失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if apple_util.checkout_start(pltn):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 进入下单页面
+        # 进入下单页面
+        while True:
             print('进入下单页面')
             x_aos_stk = apple_util.checkout()
-            if x_aos_stk is None:
-                error_message = '进入下单页面失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if x_aos_stk:
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            # 选择自提
+        # 选择自提
+        while True:
             print('选择自提')
-            if not apple_util.fulfillment_retail(x_aos_stk):
-                error_message = '选择自提失败'
-                continue
-            time.sleep(Setting.get().request_interval)
+            if apple_util.fulfillment_retail(x_aos_stk):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
 
-            buy_param = {
-                'account': account,
-                'appstore_host': apple_util.appstore_host,
-                'x_aos_stk': x_aos_stk,
-                'proxy_ip': '',
-                "proxy_port": 0,
-                'cookies': apple_util.cookies
-            }
-            if len(proxy_ip) > 0:
-                buy_param['proxy_ip'] = proxy_ip
-                buy_param['proxy_port'] = proxy_port
-            StateUtil.get().finish_task(True, buy_param, '')
-            success = True
+        # 选择店铺
+        while True:
+            print('选择店铺')
+            if apple_util.fulfillment_store(x_aos_stk, datamodel):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
+
+        # 选择联系人
+        while True:
+            print('选择联系人')
+            if apple_util.pickup_contact(x_aos_stk, datamodel):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
+
+        # 输入账单，支付
+        while True:
+            print('支付')
+            if apple_util.billing(x_aos_stk, datamodel):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
+
+        # 确认下单
+        while True:
+            print('确认订单')
+            if apple_util.review(x_aos_stk):
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
+
+        # 查询处理结果
+        while True:
+            time.sleep(2)
+            # 处理订单
+            print('处理订单')
+            finish, sucess = apple_util.query_process_result(x_aos_stk)
+            if not finish:
+                continue
             break
-        if not success:
-            message = '上号失败，账号是：{}，原因是：{}'.format(account, error_message)
-            StateUtil.get().finish_task(False, None, message)
+
+        buy_result.success = sucess
+        if sucess:
+            # 查询订单号
+            order_no = apple_util.query_order_no()
+            if order_no is None:
+                print('未查询到订单号')
+            else:
+                print('订单号是：{}'.format(order_no))
+                buy_result.order_number = order_no
+
+        # 保存结果
+        g_lock.acquire()
+        g_buy_results.append(buy_result)
+        save_buy_result_to_json()
+        g_lock.release()
+    except Exception as e:
+        print('遇到问题：{}'.format(e))
 
 
 # 加载数据，返回(success, buy_time, [datamodel])
 def load_data():
+    global g_current_plan
+    global g_buy_phone_model
+
     failed_result = (False, 0, [])
     try:
         param_file_path = os.path.join(g_work_path, 'python_args_buy.json')
@@ -184,6 +266,7 @@ def load_data():
             json_data = file.read()
             root = json.loads(json_data)
             plan_id = root['plan_id']
+            g_buy_phone_model = root["phone"]
             users = root['user']
 
         current_file_path = os.path.dirname(os.path.abspath(__file__))
@@ -193,15 +276,15 @@ def load_data():
             root = json.loads(json_data)
             plans = root['plan']
 
-        current_plan = None
+        g_current_plan = None
         for plan in plans:
             if plan_id == plan['id']:
-                current_plan = plan
+                g_current_plan = plan
                 break
-        if current_plan is None:
+        if g_current_plan is None:
             print('找不到计划')
             return failed_result
-        if not current_plan['enable_fix_time_buy']:
+        if not g_current_plan['enable_fix_time_buy']:
             print('不是设定时间开始购买')
             return failed_result
 
@@ -211,8 +294,9 @@ def load_data():
             root = json.loads(json_data)
             shops = root['shop']
 
+            # 获取店铺列表
         current_shops = []
-        for plan_shop in current_plan['shop']:
+        for plan_shop in g_current_plan['shop']:
             found = False
             for shop in shops:
                 if shop['name'] == plan_shop["name"]:
@@ -250,7 +334,7 @@ def load_data():
             data_model.giftcard_no = ''
             data_models.append(data_model)
             next_shop = (next_shop + 1) % len(current_shops)
-        return True, current_plan['fix_buy_time'], data_models
+        return True, g_current_plan['fix_buy_time'], data_models
     except Exception as e:
         print('加载数据遇到问题：{}'.format(e))
         return failed_result
@@ -258,12 +342,71 @@ def load_data():
 
 # 保存购买结果到表格文件
 def save_buy_result_to_excel():
-    pass
+    # 拷贝模板表格
+    current_file_path = os.path.dirname(os.path.abspath(__file__))
+    template_file_path = os.path.join(current_file_path, '..', 'Configs', '购买结果.xlsx')
+    now = datetime.now()
+    output_excel_file_name = now.strftime("购买结果_%Y%m%d_%H%M%S.xlsx")
+    output_excel_file = os.path.join(g_work_path, output_excel_file_name)
+    if os.path.exists(output_excel_file):
+        os.remove(output_excel_file)
+        time.sleep(0.3)
+    shutil.copy(template_file_path, output_excel_file)
+
+    # 加载表格
+    workbook = openpyxl.load_workbook(output_excel_file, data_only=True)
+    sheet = workbook.worksheets[0]
+    row = 2
+    for buy_result in g_buy_results:
+        sheet.cell(row=row, column=1, value='')
+        sheet.cell(row=row, column=2, value=g_current_plan['name'])
+        sheet.cell(row=row, column=3, value=g_current_plan['count'])
+        begin_buy_time_string = datetime.fromtimestamp(buy_result.begin_buy_time).strftime('%Y-%m-%d %H:%M:%S')
+        sheet.cell(row=row, column=4, value=begin_buy_time_string)
+        sheet.cell(row=row, column=5, value=g_buy_phone_model['name'])
+        sheet.cell(row=row, column=6, value=buy_result.proxy_server)
+        sheet.cell(row=row, column=7, value='')
+        sheet.cell(row=row, column=8, value=('购物成功' if buy_result.success else '购物失败'))
+        sheet.cell(row=row, column=9, value=buy_result.order_number)
+        sheet.cell(row=row, column=10, value='')
+        order_link = ''
+        if len(buy_result.order_number) > 0:
+            order_link = ('https://www.apple.com/xc/jp/vieworder/{}/{}'
+                          .format(buy_result.order_number, buy_result.buy_param.account))
+        sheet.cell(row=row, column=11, value=order_link)
+        sheet.cell(row=row, column=12, value='jp')
+        buy_param_obj = buy_result.buy_param
+        name = buy_param_obj.first_name + buy_param_obj.last_name
+        address = buy_param_obj.state + buy_param_obj.city + buy_param_obj.street + buy_param_obj.street2
+        order_info = "电话：{}, 名字：{}， 地址：{}".format(buy_param_obj.telephone, name, address)
+        sheet.cell(row=row, column=12, value=order_info)
+        sheet.cell(row=row, column=13, value=buy_param_obj.account)
+        sheet.cell(row=row, column=14, value=buy_param_obj.store_name)
+        sheet.cell(row=row, column=15, value='')
+        sheet.cell(row=row, column=16, value=buy_param_obj.email)
+        sheet.cell(row=row, column=17, value=buy_param_obj.password)
+        sheet.cell(row=row, column=18, value=buy_result.fail_reason)
+
+        row += 1
+
+    # 保存修改后的Excel文件
+    workbook.save(output_excel_file)
 
 
 # 保存购买结果到表格文件
 def save_buy_result_to_json():
-    pass
+    root = []
+    for buy_result in g_buy_results:
+        item = {
+            'account': buy_result.buy_param.account,
+            'success': buy_result.success,
+            'order_number': buy_result.order_number
+        }
+        root.append(item)
+
+    config_file_path = os.path.join(g_work_path, r'buy_result.json')
+    with open(config_file_path, "w", encoding='utf-8') as file:
+        json.dump(root, file, indent=4)
 
 
 def main():
@@ -312,17 +455,18 @@ def main():
             success, proxy_server_list2, message = get_proxy_server_list('jp')
             if success:
                 proxy_server_list = proxy_server_list2
+    print('开始购买')
 
     # 多线程并发购买
     threads = []
     thread_num = len(datamodels)
     proxy_count_per_thread = len(proxy_server_list) // thread_num
-    for datamodel in datamodels:
+    for i in range(thread_num):
         if i < thread_num - 1:
             proxys = proxy_server_list[i * proxy_count_per_thread: (i + 1) * proxy_count_per_thread]
         else:
             proxys = proxy_server_list[i * proxy_count_per_thread:]
-        args = (proxys, datamodel)
+        args = (proxys, datamodels[i])
         thread = threading.Thread(target=buy, args=args)
         thread.start()
         threads.append(thread)
@@ -330,6 +474,7 @@ def main():
         thread.join()
 
     # 保存购买结果到表格文件
+    print('保存购买结果')
     save_buy_result_to_excel()
 
 
