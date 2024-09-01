@@ -284,7 +284,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QTimeEdit" name="fixTimeEdit"/>
+       <widget class="QDateTimeEdit" name="fixDateTimeEdit"/>
       </item>
      </layout>
     </item>

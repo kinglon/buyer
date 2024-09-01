@@ -14,8 +14,8 @@ using namespace QXlsx;
 // 列名
 QString columnAccount = QString::fromWCharArray(L"id账号");
 QString columnPassword = QString::fromWCharArray(L"id密码");
-QString columnLastName = QString::fromWCharArray(L"姓");
-QString columnFirstName = QString::fromWCharArray(L"名");
+QString columnFirstName = QString::fromWCharArray(L"姓");
+QString columnLastName = QString::fromWCharArray(L"名");
 QString columnTelephone = QString::fromWCharArray(L"电话");
 QString columnEmail = QString::fromWCharArray(L"邮箱");
 QString columnCreditCardNo = QString::fromWCharArray(L"信用卡卡号");

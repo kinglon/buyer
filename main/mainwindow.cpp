@@ -8,6 +8,7 @@
 #include "planrunner.h"
 #include "userinfomanager.h"
 #include "uiutil.h"
+#include "fixtimebuyer.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -160,6 +161,34 @@ void MainWindow::onDeletePlanBtn(QString planId)
 
 void MainWindow::onRunPlanBtn(QString planId)
 {
+    PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
+    if (plan == nullptr)
+    {
+        return;
+    }
+
+    if (plan->m_enableFixTimeBuy)
+    {
+        if (FixTimeBuyer::getInstance()->isRunning())
+        {
+            addLog(QString::fromWCharArray(L"购买程序已经运行"));
+            return;
+        }
+
+        if (FixTimeBuyer::getInstance()->start(planId))
+        {
+            addLog(QString::fromWCharArray(L"购买程序运行中"));
+            return;
+        }
+        else
+        {
+            QString error = FixTimeBuyer::getInstance()->getLastError();
+            addLog(QString::fromWCharArray(L"购买程序启动失败，错误是：%1").arg(error));
+            return;
+        }
+    }
+
+
     PlanRunner* planRunner = m_planRunners[planId];
     if (planRunner)
     {

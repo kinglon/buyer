@@ -96,13 +96,14 @@ void PlanDialog::updateCtrls()
    if (m_planItem.m_enableFixTimeBuy)
    {
        ui->fixTimeCheckBox->setChecked(true);
-       ui->fixTimeEdit->setTime(QTime(0,0).addSecs(m_planItem.m_fixBuyTime));
+       QDateTime dateTime = QDateTime::fromSecsSinceEpoch(m_planItem.m_fixBuyTime);
+       ui->fixDateTimeEdit->setDateTime(dateTime);
    }
    else
    {
        ui->fixTimeCheckBox->setChecked(false);
        QDateTime now = QDateTime::currentDateTime();
-       ui->fixTimeEdit->setTime(QTime(now.time().hour(),0));
+       ui->fixDateTimeEdit->setDateTime(now);
    }
 
    updateShopCtrls();
@@ -184,7 +185,7 @@ void PlanDialog::onOkBtn()
     m_planItem.m_enableFixTimeBuy = ui->fixTimeCheckBox->isChecked();
     if (m_planItem.m_enableFixTimeBuy)
     {
-        m_planItem.m_fixBuyTime = QTime(0,0).secsTo(ui->fixTimeEdit->time());
+        m_planItem.m_fixBuyTime = ui->fixDateTimeEdit->dateTime().toSecsSinceEpoch();
     }
 
     if (m_planItem.m_buyingShops.empty())

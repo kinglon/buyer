@@ -16,6 +16,7 @@ SOURCES += \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
     datamodel.cpp \
+    fixtimebuyer.cpp \
     goodsavailabilitychecker.cpp \
     goodsbuyer.cpp \
     httpthread.cpp \
@@ -39,6 +40,7 @@ HEADERS += \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
     datamodel.h \
+    fixtimebuyer.h \
     goodsavailabilitychecker.h \
     goodsbuyer.h \
     httpthread.h \

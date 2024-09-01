@@ -187,8 +187,8 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
             QMap<QString, QString> body;
             body["checkout.pickupContact.pickupContactOptions.selectedPickupOption"] = "SELF";
             body["checkout.pickupContact.selfPickupContact.selfContact.address.emailAddress"] = userData->m_buyParam.m_user.m_email;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.lastName"] = userData->m_buyParam.m_user.m_lastName;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.firstName"] = userData->m_buyParam.m_user.m_firstName;
+            body["checkout.pickupContact.selfPickupContact.selfContact.address.lastName"] = userData->m_buyParam.m_user.m_firstName;
+            body["checkout.pickupContact.selfPickupContact.selfContact.address.firstName"] = userData->m_buyParam.m_user.m_lastName;
             body["checkout.pickupContact.selfPickupContact.selfContact.address.mobilePhone"] = userData->m_buyParam.m_user.m_telephone;
             body["checkout.pickupContact.selfPickupContact.selfContact.address.isDaytimePhoneSelected"] = "false";
 
