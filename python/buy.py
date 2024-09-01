@@ -464,7 +464,7 @@ def main():
         now = datetime.now().timestamp()
         if now >= buy_time:
             break
-        elapse = buy_time - now
+        elapse = int(buy_time - now)
         if now - last_print_time >= 10:  # 每隔10秒打印一次
             print('倒计时：{}秒'.format(elapse))
             last_print_time = now
@@ -501,3 +501,4 @@ def main():
 if __name__ == '__main__':
     main()
     print('购买完成')
+    time.sleep(1200)

@@ -342,7 +342,7 @@ bool PlanRunner::loadAddCartResult()
         buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
         buyParam.m_proxyIp = buyParamJson.toObject()["proxy_ip"].toString();
         buyParam.m_proxyPort = buyParamJson.toObject()["proxy_port"].toInt();
-        buyParam.m_localIp = buyParamJson.toObject()["local_ip"].toInt();
+        buyParam.m_localIp = buyParamJson.toObject()["local_ip"].toString();
 
         QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
         for (auto& cookieKey : cookieJson.keys())

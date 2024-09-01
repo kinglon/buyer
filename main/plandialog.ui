@@ -284,7 +284,11 @@
        </widget>
       </item>
       <item>
-       <widget class="QDateTimeEdit" name="fixDateTimeEdit"/>
+       <widget class="QDateTimeEdit" name="fixDateTimeEdit">
+        <property name="displayFormat">
+         <string>yyyy/M/d H:mm:ss</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
