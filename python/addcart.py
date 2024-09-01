@@ -60,6 +60,8 @@ def add_cart(proxys, users, local_ips, phone_model):
         apple_util.proxies = proxy
         print('使用代理IP：{}'.format(proxy))
 
+        fail_reason_prefix = '上号失败，账号是：{}，原因是：'.format(account)
+
         # 使用本地IP地址
         local_ip = local_ips[i % len(local_ips)]
         try:
@@ -71,8 +73,8 @@ def add_cart(proxys, users, local_ips, phone_model):
             apple_util.session = session
         except Exception as e:
             print('遇到问题：{}'.format(e))
-            message = '上号失败，账号是：{}，原因是：指定本地IP({})发送失败'.format(account, local_ip)
-            StateUtil.get().finish_task(False, None, message)
+            error_message = '指定本地IP({})发送失败'.format(local_ip)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
 
         max_retry_count = 3
@@ -88,7 +90,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -103,7 +105,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -118,7 +120,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -131,7 +133,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -146,7 +148,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -159,7 +161,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -173,7 +175,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
@@ -186,7 +188,7 @@ def add_cart(proxys, users, local_ips, phone_model):
                 continue
             break
         if len(error_message) > 0:
-            StateUtil.get().finish_task(False, None, error_message)
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
 
         buy_param = {
@@ -213,7 +215,7 @@ def main():
 
     StateUtil.get().saved_path = work_path
 
-    print('开始上号')
+    print('开始')
 
     try:
         # 获取本地IP列表
@@ -288,4 +290,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-    print('上号完成')
+    print('完成')

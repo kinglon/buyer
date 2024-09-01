@@ -95,6 +95,14 @@ class AppleUtil:
         public_value = public_value_bigint.to_bytes((public_value_bigint.bit_length() + 7) // 8, 'big')
         return [private_value, public_value]
 
+    # 解析页面标题
+    @staticmethod
+    def parse_page_title(response_json):
+        if ('body' in response_json and 'meta' in response_json['body'] and 'page' in response_json['body']['meta'] and
+           'title' in response_json['body']['meta']['page']):
+            return response_json['body']['meta']['page']['title']
+        return ''
+
     # 登录前的初始化
     # public_value, base64串
     # account_name, 账号
@@ -418,18 +426,18 @@ class AppleUtil:
                     .format(data_model.store, data_model.postal_code))
             self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
-                print("选择自提失败，错误是：{}".format(self.last_response))
+                print("选择店铺失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
-            print("选择自提失败，错误是：{}".format(e))
+            print("选择店铺失败，错误是：{}".format(e))
             return False
 
     # 选择联系人
@@ -462,7 +470,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -498,7 +506,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -541,7 +549,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -584,7 +592,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -631,7 +639,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -688,7 +696,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -714,7 +722,7 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(root['body']['meta']['page']['title']))
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -741,8 +749,9 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            if 'meta' in root['body'] and 'page' in root['body']['meta']:
-                print('下单失败，进入的页面标题：{}'.format(root['body']['meta']['page']['title']))
+            page_title = AppleUtil.parse_page_title(root)
+            if len(page_title) > 0:
+                print('下单失败，进入的页面标题：{}'.format(page_title))
                 return True, False
             elif data.lower().find('thankyou') >= 0:
                 print('下单成功')

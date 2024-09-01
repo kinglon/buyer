@@ -294,12 +294,12 @@ def load_data():
             root = json.loads(json_data)
             shops = root['shop']
 
-            # 获取店铺列表
+        # 获取店铺列表
         current_shops = []
         for plan_shop in g_current_plan['shop']:
             found = False
             for shop in shops:
-                if shop['name'] == plan_shop["name"]:
+                if shop['name'] == plan_shop:
                     found = True
                     current_shops.append(shop)
                     break
@@ -358,34 +358,54 @@ def save_buy_result_to_excel():
     sheet = workbook.worksheets[0]
     row = 2
     for buy_result in g_buy_results:
-        sheet.cell(row=row, column=1, value='')
-        sheet.cell(row=row, column=2, value=g_current_plan['name'])
-        sheet.cell(row=row, column=3, value=g_current_plan['count'])
+        column = 1
+        sheet.cell(row=row, column=column, value='')
+        column += 1
+        sheet.cell(row=row, column=column, value=g_current_plan['name'])
+        column += 1
+        sheet.cell(row=row, column=column, value=g_current_plan['count'])
+        column += 1
         begin_buy_time_string = datetime.fromtimestamp(buy_result.begin_buy_time).strftime('%Y-%m-%d %H:%M:%S')
-        sheet.cell(row=row, column=4, value=begin_buy_time_string)
-        sheet.cell(row=row, column=5, value=g_buy_phone_model['name'])
-        sheet.cell(row=row, column=6, value=buy_result.proxy_server)
-        sheet.cell(row=row, column=7, value='')
-        sheet.cell(row=row, column=8, value=('购物成功' if buy_result.success else '购物失败'))
-        sheet.cell(row=row, column=9, value=buy_result.order_number)
-        sheet.cell(row=row, column=10, value='')
+        sheet.cell(row=row, column=column, value=begin_buy_time_string)
+        column += 1
+        sheet.cell(row=row, column=column, value=g_buy_phone_model['name'])
+        column += 1
+        sheet.cell(row=row, column=column, value=str(buy_result.proxy_server))
+        column += 1
+        sheet.cell(row=row, column=column, value='')
+        column += 1
+        sheet.cell(row=row, column=column, value=('购物成功' if buy_result.success else '购物失败'))
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_result.order_number)
+        column += 1
+        sheet.cell(row=row, column=column, value='')
+        column += 1
         order_link = ''
         if len(buy_result.order_number) > 0:
             order_link = ('https://www.apple.com/xc/jp/vieworder/{}/{}'
                           .format(buy_result.order_number, buy_result.buy_param.account))
-        sheet.cell(row=row, column=11, value=order_link)
-        sheet.cell(row=row, column=12, value='jp')
+        sheet.cell(row=row, column=column, value=order_link)
+        column += 1
+        sheet.cell(row=row, column=column, value='jp')
+        column += 1
         buy_param_obj = buy_result.buy_param
         name = buy_param_obj.first_name + buy_param_obj.last_name
         address = buy_param_obj.state + buy_param_obj.city + buy_param_obj.street + buy_param_obj.street2
         order_info = "电话：{}, 名字：{}， 地址：{}".format(buy_param_obj.telephone, name, address)
-        sheet.cell(row=row, column=12, value=order_info)
-        sheet.cell(row=row, column=13, value=buy_param_obj.account)
-        sheet.cell(row=row, column=14, value=buy_param_obj.store_name)
-        sheet.cell(row=row, column=15, value='')
-        sheet.cell(row=row, column=16, value=buy_param_obj.email)
-        sheet.cell(row=row, column=17, value=buy_param_obj.password)
-        sheet.cell(row=row, column=18, value=buy_result.fail_reason)
+        sheet.cell(row=row, column=column, value=order_info)
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_param_obj.account)
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_param_obj.store_name)
+        column += 1
+        sheet.cell(row=row, column=column, value='')
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_param_obj.email)
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_param_obj.password)
+        column += 1
+        sheet.cell(row=row, column=column, value=buy_result.fail_reason)
+        column += 1
 
         row += 1
 
