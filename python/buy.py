@@ -383,7 +383,7 @@ def save_buy_result_to_excel():
         order_link = ''
         if len(buy_result.order_number) > 0:
             order_link = ('https://www.apple.com/xc/jp/vieworder/{}/{}'
-                          .format(buy_result.order_number, buy_result.buy_param.account))
+                          .format(buy_result.order_number, buy_result.buy_param.email))
         sheet.cell(row=row, column=column, value=order_link)
         column += 1
         sheet.cell(row=row, column=column, value='jp')

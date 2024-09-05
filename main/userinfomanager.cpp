@@ -28,9 +28,15 @@ QString columnStreet1 = QString::fromWCharArray(L"地址（区）");
 QString columnStreet2 = QString::fromWCharArray(L"地址（具体门牌号）");
 QString columnGiftNo = QString::fromWCharArray(L"礼品卡号");
 
+// 用户资料模板文件名
+#define USER_TEMPLATE_FILE_NAME     L"用户资料模板.xlsx"
+
+// 当前用户资料文件名
+#define CURRENT_USER_FILE_NAME     L"用户资料.xlsx"
+
 UserInfoManager::UserInfoManager()
 {
-    std::wstring excelFilePath = CImPath::GetConfPath() + L"用户资料.xlsx";
+    std::wstring excelFilePath = CImPath::GetConfPath() + CURRENT_USER_FILE_NAME;
     QVector<QString> headers;
     loadUserInfo(QString::fromStdWString(excelFilePath), true, headers, m_users);
 }
@@ -63,16 +69,34 @@ bool UserInfoManager::importUserInfo(QString excelFilePath)
         return false;
     }
 
-    std::wstring internalFilePath = CImPath::GetConfPath() + L"用户资料.xlsx";
-    DeleteFile(internalFilePath.c_str());
-    if (!CopyFile(excelFilePath.toStdWString().c_str(), internalFilePath.c_str(), TRUE))
+    if (!save(users))
     {
         return false;
     }
 
-    // todo by yejinlong, 对敏感信息进行加密后更新到表格
-
     m_users = users;
+    return true;
+}
+
+bool UserInfoManager::deleteUsers(const QVector<QString>& accountNames)
+{
+    for (const auto& accountName : accountNames)
+    {
+        for (auto it=m_users.begin(); it!=m_users.end(); it++)
+        {
+            if (it->m_accountName == accountName)
+            {
+                m_users.erase(it);
+                break;
+            }
+        }
+    }
+
+    if (!save(m_users))
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -135,7 +159,7 @@ bool UserInfoManager::loadUserInfo(QString excelFilePath, bool , QVector<QString
             }
             if (columnName == columnExpiredDate)
             {
-                user.m_expiredData = value;
+                user.m_expiredDate = value;
             }
             if (columnName == columnFirstName)
             {
@@ -174,7 +198,61 @@ bool UserInfoManager::loadUserInfo(QString excelFilePath, bool , QVector<QString
                 user.m_telephone = value;
             }
         }
-        users.append(user);
+
+        if (user.isValid())
+        {
+            users.append(user);
+        }
+    }
+
+    return true;
+}
+
+bool UserInfoManager::save(const QVector<UserItem>& users)
+{
+    // 拷贝默认模板
+    std::wstring srcExcelFilePath = CImPath::GetConfPath() + USER_TEMPLATE_FILE_NAME;
+    std::wstring destExcelFilePath = CImPath::GetDataPath() + CURRENT_USER_FILE_NAME;
+    ::DeleteFile(destExcelFilePath.c_str());
+    if (!::CopyFile(srcExcelFilePath.c_str(), destExcelFilePath.c_str(), TRUE))
+    {
+        qCritical("failed to copy the default excel file");
+        return false;
+    }
+
+    Document xlsx(QString::fromStdWString(destExcelFilePath));
+    if (!xlsx.load())
+    {
+        qCritical("failed to load the default excel file");
+        return false;
+    }
+
+    // 从第2行开始写
+    int row = 2;
+    for (const auto& user : users)
+    {
+        int column = 1;
+        xlsx.write(row, column++, user.m_accountName);
+        xlsx.write(row, column++, user.m_password);
+        xlsx.write(row, column++, user.m_firstName);
+        xlsx.write(row, column++, user.m_lastName);
+        xlsx.write(row, column++, user.m_telephone);
+        xlsx.write(row, column++, user.m_email);
+        xlsx.write(row, column++, user.m_creditCardNo);
+        xlsx.write(row, column++, user.m_expiredDate);
+        xlsx.write(row, column++, user.m_cvv);
+        xlsx.write(row, column++, user.m_postalCode);
+        xlsx.write(row, column++, user.m_state);
+        xlsx.write(row, column++, user.m_city);
+        xlsx.write(row, column++, user.m_street);
+        xlsx.write(row, column++, user.m_street2);
+        row++;
+    }
+
+    if (!xlsx.save())
+    {
+        qCritical("failed to save the user excel file");
+        return false;
     }
 
     return true;

@@ -594,6 +594,8 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
         static QString successMsg = QString::fromWCharArray(L"购买成功");
         static QString failMsg = QString::fromWCharArray(L"购买失败");
 
+        UserItem user = UserInfoManager::getInstance()->getUserByAccount(buyResult.m_account);
+
         int column = 1;
         xlsx.write(row, column++, ""); // Robot_id
         xlsx.write(row, column++, plan->m_name); // 任务名称
@@ -609,13 +611,12 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
         QString orderLink;
         if (!buyResult.m_orderNo.isEmpty())
         {
-            orderLink = QString("https://www.apple.com/xc/jp/vieworder/%1/%2").arg(buyResult.m_orderNo, buyResult.m_account);
+            orderLink = QString("https://www.apple.com/xc/jp/vieworder/%1/%2").arg(buyResult.m_orderNo, user.m_email);
         }
         xlsx.write(row, column++, orderLink); // 下单链接
         xlsx.write(row, column++, "jp"); // 地区
 
         QString orderInfo;
-        UserItem user = UserInfoManager::getInstance()->getUserByAccount(buyResult.m_account);
         if (!user.m_accountName.isEmpty())
         {
             orderInfo = QString::fromWCharArray(L"电话：%1, 名字：%2， 地址：%3")
@@ -657,8 +658,40 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
     return true;
 }
 
-void PlanRunner::finishPlan()
+bool PlanRunner::deleteSuccessUsers(const QVector<BuyResult>& buyResults)
 {
+    QVector<QString> accountNames;
+    for (auto& buyResult : buyResults)
+    {
+        if (!buyResult.m_orderNo.isEmpty())
+        {
+            accountNames.append(buyResult.m_account);
+        }
+    }
+
+    if (accountNames.size() == 0)
+    {
+        return true;
+    }
+
+    if (!UserInfoManager::getInstance()->deleteUsers(accountNames))
+    {
+        emit printLog(QString::fromWCharArray(L"删除下单成功的用户资料失败"));
+        return false;
+    }
+    else
+    {
+        QString message = QString::fromWCharArray(L"删除下单成功的用户资料%1条，现剩%2条").arg(
+                    QString::number(accountNames.size()),
+                    QString::number(UserInfoManager::getInstance()->m_users.size()));
+        emit printLog(message);
+        return true;
+    }
+}
+
+void PlanRunner::finishPlan()
+{    
     saveBuyingResult(m_buyResults);
+    deleteSuccessUsers(m_buyResults);
     emit runFinish(m_planId, true);
 }

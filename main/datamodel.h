@@ -41,7 +41,7 @@ public:
     QString m_creditCardNo;
 
     // 过期时间
-    QString m_expiredData;
+    QString m_expiredDate;
 
     // CVV
     QString m_cvv;
@@ -63,6 +63,22 @@ public:
 
     // 礼品卡号
     QString m_giftCardNo;
+
+public:
+    bool isValid()
+    {
+        if (m_accountName.isEmpty() || m_password.isEmpty() || m_firstName.isEmpty() || m_lastName.isEmpty()
+                || m_telephone.isEmpty() || m_email.isEmpty() || m_creditCardNo.isEmpty()
+                || m_expiredDate.isEmpty() || m_cvv.isEmpty() || m_postalCode.isEmpty()
+                || m_state.isEmpty() || m_city.isEmpty() || m_street.isEmpty())
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
 };
 
 class ShopItem

@@ -49,6 +49,9 @@ private:
     // 保存购买结果
     bool saveBuyingResult(const QVector<BuyResult>& buyResults);
 
+    // 删除下单成功的用户
+    bool deleteSuccessUsers(const QVector<BuyResult>& buyResults);
+
     // 流程结束
     void finishPlan();
 

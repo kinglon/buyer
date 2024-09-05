@@ -149,7 +149,7 @@ bool FixTimeBuyer::createBuyerParamFile(PlanItem* plan, QString paramFilePath)
         userJson["telephone"] = user.m_telephone;
         userJson["email"] = user.m_email;
         userJson["credit_card_no"] = user.m_creditCardNo;
-        userJson["expired_date"] = user.m_expiredData;
+        userJson["expired_date"] = user.m_expiredDate;
         userJson["cvv"] = user.m_cvv;
         userJson["postal_code"] = user.m_postalCode;
         userJson["state"] = user.m_state;

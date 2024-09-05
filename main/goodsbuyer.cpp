@@ -80,15 +80,16 @@ void GoodsBuyer::run()
         }
         else
         {
-            if (SettingManager::getInstance()->m_enableDebug)
-            {
-                qCritical("failed to send request, error is %d", m->data.result);
-            }
+            qCritical("failed to send request, error is %d", m->data.result);
 
             BuyUserData* userData = nullptr;
             curl_easy_getinfo(m->easy_handle, CURLINFO_PRIVATE, &userData);
             if (userData)
             {
+                userData->m_buyResult.m_failReason = QString::fromWCharArray(L"请求发送失败，错误码是%1").arg(m->data.result);
+                QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                        .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+                emit printLog(log);
                 m_buyResults.append(userData->m_buyResult);
                 delete userData;
             }
@@ -219,7 +220,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
             body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection"] = creditCardPrefix;
             body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType"] = "MASTERCARD";
             body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode"] = userData->m_buyParam.m_user.m_cvv;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration"] = userData->m_buyParam.m_user.m_expiredData;
+            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration"] = userData->m_buyParam.m_user.m_expiredDate;
             body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber"] = creditCardCipher;
             body["checkout.locationConsent.locationConsent"] = "false";
             body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.city"] = userData->m_buyParam.m_user.m_city;
@@ -325,6 +326,10 @@ void GoodsBuyer::handleResponse(CURL* curl)
     // 网络请求报错，流程结束
     if (!(statusCode >= 200 && statusCode < 400))
     {
+        userData->m_buyResult.m_failReason = QString::fromWCharArray(L"服务器返回%1").arg(statusCode);
+        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+        emit printLog(log);
         m_buyResults.append(userData->m_buyResult);
         delete userData;
         return;
@@ -424,6 +429,7 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
     if (jsonDocument.isNull() || jsonDocument.isEmpty())
     {
+        qCritical("failed to parse the process response data");
         return false;
     }
 
