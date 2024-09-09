@@ -10,6 +10,7 @@ from datetime import datetime
 from datamodel import DataModel
 import shutil
 import openpyxl
+import traceback
 
 
 # 工作目录
@@ -252,6 +253,7 @@ def buy(proxys, datamodel):
         g_lock.release()
     except Exception as e:
         print('遇到问题：{}'.format(e))
+        traceback.print_stack()
 
 
 # 加载数据，返回(success, buy_time, [datamodel])
@@ -336,7 +338,7 @@ def load_data():
             next_shop = (next_shop + 1) % len(current_shops)
         return True, g_current_plan['fix_buy_time'], data_models
     except Exception as e:
-        print('加载数据遇到问题：{}'.format(e))
+        print('加载数据遇到问题：{}'.format(e))        
         return failed_result
 
 
@@ -448,7 +450,7 @@ def main():
     for i in range(3):
         print('获取代理IP列表')
         success, proxy_server_list, message = get_proxy_server_list('jp')
-        if not success:
+        if not success or len(proxy_server_list) == 0:
             continue
         break
 
@@ -488,13 +490,14 @@ def main():
             proxys = proxy_server_list[i * proxy_count_per_thread:]
         args = (proxys, datamodels[i])
         thread = threading.Thread(target=buy, args=args)
+        thread.daemon = True
         thread.start()
         threads.append(thread)
     
     # 等待退出
     while True:
         # 如果有exit_buy文件，就退出
-        if os.path.exists(os.path.join(g_work_path, 'exit_buy'):
+        if os.path.exists(os.path.join(g_work_path, 'exit_buy')):
             print('手动结束购买')
             break
             
@@ -515,4 +518,4 @@ def main():
 if __name__ == '__main__':
     main()
     print('购买完成')
-    time.sleep(1200)
+    time.sleep(10)

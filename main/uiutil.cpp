@@ -16,7 +16,8 @@ bool UiUtil::showTipV2(QString tip)
     msgBox.setWindowTitle(QString::fromWCharArray(L"提示"));
     msgBox.setText(tip);
     msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-    if (msgBox.exec() == QMessageBox::Accepted)
+    int result = msgBox.exec();
+    if (result == QMessageBox::Ok)
     {
         return true;
     }
