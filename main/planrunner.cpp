@@ -39,22 +39,7 @@ bool PlanRunner::start()
         return false;
     }
     m_planName = plan->m_name;
-
-    // 重建计划数据目录
     m_planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
-    if (!SettingManager::getInstance()->m_useCacheAddCartResult)
-    {
-        QDir folderDir(m_planDataPath);
-        if (folderDir.exists())
-        {
-            if (!folderDir.removeRecursively())
-            {
-                printLog(QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开"));
-                return false;
-            }
-        }
-        CreateDirectory(m_planDataPath.toStdWString().c_str(), nullptr);
-    }    
 
     if (!launchAddCartRunner(plan))
     {

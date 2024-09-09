@@ -9,6 +9,8 @@
 #include "userinfomanager.h"
 #include "uiutil.h"
 #include "fixtimebuyer.h"
+#include "Utility/ImPath.h"
+#include "settingmanager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -85,6 +87,32 @@ QListWidgetItem* MainWindow::getPlanListItem(QString planId)
     }
 
     return nullptr;
+}
+
+bool MainWindow::createPlanDataDirectory(QString planName)
+{
+    // 重建计划数据目录
+    QString planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + planName;
+    if (!SettingManager::getInstance()->m_useCacheAddCartResult)
+    {
+        QDir folderDir(planDataPath);
+        if (folderDir.exists())
+        {
+            if (!UiUtil::showTipV2(QString::fromWCharArray(L"原来购买数据将被清空，是否继续？")))
+            {
+                return false;
+            }
+
+            if (!folderDir.removeRecursively())
+            {
+                addLog(QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开"));
+                return false;
+            }
+        }
+        CreateDirectory(planDataPath.toStdWString().c_str(), nullptr);
+    }
+
+    return true;
 }
 
 void MainWindow::onImportUserInfoBtn()
@@ -165,27 +193,38 @@ void MainWindow::onRunPlanBtn(QString planId)
     if (plan == nullptr)
     {
         return;
-    }
+    }    
 
     if (plan->m_enableFixTimeBuy)
     {
+        // 定时购买流程
         if (FixTimeBuyer::getInstance()->isRunning())
         {
-            addLog(QString::fromWCharArray(L"购买程序已经运行"));
+            if (!UiUtil::showTipV2(QString::fromWCharArray(L"购买程序正在运行，您确定要结束购买吗？")))
+            {
+                return;
+            }
+
+            FixTimeBuyer::getInstance()->stop();
+            return;
+        }
+
+        if (!createPlanDataDirectory(plan->m_name))
+        {
             return;
         }
 
         if (FixTimeBuyer::getInstance()->start(planId))
         {
-            addLog(QString::fromWCharArray(L"购买程序运行中"));
-            return;
+            addLog(QString::fromWCharArray(L"购买程序已启动"));
         }
         else
         {
             QString error = FixTimeBuyer::getInstance()->getLastError();
             addLog(QString::fromWCharArray(L"购买程序启动失败，错误是：%1").arg(error));
-            return;
         }
+
+        return;
     }
 
 
@@ -193,6 +232,11 @@ void MainWindow::onRunPlanBtn(QString planId)
     if (planRunner)
     {
         qCritical("the plan has been running");
+        return;
+    }
+
+    if (!createPlanDataDirectory(plan->m_name))
+    {
         return;
     }
 

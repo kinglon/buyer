@@ -490,12 +490,26 @@ def main():
         thread = threading.Thread(target=buy, args=args)
         thread.start()
         threads.append(thread)
-    for thread in threads:
-        thread.join()
+    
+    # 等待退出
+    while True:
+        # 如果有exit_buy文件，就退出
+        if os.path.exists(os.path.join(g_work_path, 'exit_buy'):
+            print('手动结束购买')
+            break
+            
+        # 每个线程都购买结束
+        if len(datamodels) == len(g_buy_results):
+            break
+        
+        time.sleep(1)
+        
 
     # 保存购买结果到表格文件
     print('保存购买结果')
+    g_lock.acquire()
     save_buy_result_to_excel()
+    g_lock.release()
 
 
 if __name__ == '__main__':

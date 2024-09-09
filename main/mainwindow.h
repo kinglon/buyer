@@ -49,6 +49,8 @@ private:
 
     QListWidgetItem* getPlanListItem(QString planId);
 
+    bool createPlanDataDirectory(QString planName);
+
 private slots:
     void onImportUserInfoBtn();
 

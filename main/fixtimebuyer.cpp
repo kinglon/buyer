@@ -45,24 +45,14 @@ bool FixTimeBuyer::start(QString planId)
         return true;
     }
 
+    m_planId = planId;
     PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
     if (plan == nullptr)
     {
         return false;
     }
 
-    // 重新创建计划数据目录
-    QString planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + plan->m_name;
-    QDir folderDir(planDataPath);
-    if (folderDir.exists())
-    {
-        if (!folderDir.removeRecursively())
-        {
-            m_lastError = QString::fromWCharArray(L"无法删除数据目录，购买结果表格文件可能被打开");
-            return false;
-        }
-    }
-    CreateDirectory(planDataPath.toStdWString().c_str(), nullptr);
+    QString planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + plan->m_name;    
 
     // 创建参数文件
     QString argsFilePath = planDataPath + "\\python_args_buy.json";
@@ -96,6 +86,23 @@ bool FixTimeBuyer::start(QString planId)
     CloseHandle(pi.hThread);
     m_hProcess = pi.hProcess;
     return true;
+}
+
+void FixTimeBuyer::stop()
+{
+    PlanItem* plan = PlanManager::getInstance()->getPlanById(m_planId);
+    if (plan == nullptr)
+    {
+        return;
+    }
+
+    QString planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + plan->m_name;
+    QString exitFilePath = planDataPath + "\\exit_buy";
+    QFile file(exitFilePath);
+    if (file.open(QFile::WriteOnly))
+    {
+        file.close();
+    }
 }
 
 bool FixTimeBuyer::createBuyerParamFile(PlanItem* plan, QString paramFilePath)

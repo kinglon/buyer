@@ -1,6 +1,7 @@
 ﻿#include "plandialog.h"
 #include <QThread>
 #include <QUuid>
+#include <QTimeZone>
 #include "ui_plandialog.h"
 #include "settingmanager.h"
 #include "uiutil.h"
@@ -97,12 +98,16 @@ void PlanDialog::updateCtrls()
    {
        ui->fixTimeCheckBox->setChecked(true);
        QDateTime dateTime = QDateTime::fromSecsSinceEpoch(m_planItem.m_fixBuyTime);
+       QTimeZone desiredTimeZone("Asia/Shanghai");
+       dateTime.setTimeZone(desiredTimeZone);
        ui->fixDateTimeEdit->setDateTime(dateTime);
    }
    else
    {
        ui->fixTimeCheckBox->setChecked(false);
        QDateTime now = QDateTime::currentDateTime();
+       QTimeZone desiredTimeZone("Asia/Shanghai");
+       now.setTimeZone(desiredTimeZone);
        ui->fixDateTimeEdit->setDateTime(now);
    }
 

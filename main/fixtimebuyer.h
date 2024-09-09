@@ -18,6 +18,8 @@ public:
 
     bool start(QString planId);
 
+    void stop();
+
     QString getLastError() { return m_lastError; }
 
 private:
@@ -28,6 +30,8 @@ private:
     HANDLE m_hProcess = NULL;
 
     QString m_lastError;
+
+    QString m_planId;
 };
 
 #endif // FIXTIMEBUYER_H
