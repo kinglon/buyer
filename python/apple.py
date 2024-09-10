@@ -1,3 +1,5 @@
+import random
+
 import requests
 import json
 import base64
@@ -107,13 +109,13 @@ class AppleUtil:
     # public_value, base64串
     # account_name, 账号
     # 返回：
-    # {
+    #
     #     "iteration": 20173,
     #     "salt": "SInpSF5/lsMlDU5xPZIa8w==",
     #     "protocol": "s2k",
     #     "b": "VQmWgVyEjNb/tSPcslrO6UF2JMYLolrS1jYyTCd5v8CaX03fG8HbktmVpZ7Iztfxsuwqs6p2L6QFV4yBHfjkphGjq+D/JwyxZwkJe5bHjP3RB4cx7IrPnJNe0LaG41+3v95A8j0F20hEBikHDdroSiLQ7Hw3JO9N7hZaensnAi15NfTNGPTcm4gWAQwU/bQBhDRsM1mp1iGgRJmXZkPF9IpvA60FpygkCxgpvgYMpmy+YzO1OFpbi/172TLrFB5twZoXVAuuKC5GsGVeH8WbUkwHbDg1znjvaidVP3wS8VRSJFu78Bi7YvMWvYc28AvCjULh6nBoxekbRkR32An2zg==",
     #     "c": "d-444-88ff3978-31f9-11ef-bc4e-eb1aee3d6c79:MSA"
-    # }
+    #
     def auth_init(self, public_value, account_name):
         try:
             uri = '/appleauth/auth/signin/init'
@@ -211,15 +213,18 @@ class AppleUtil:
             # 加入购物车
             atbtoken = self.cookies['as_atb']
             atbtoken = atbtoken[atbtoken.rfind('|')+1:]
-            url = (self.apple_host + '/shop/buy-iphone/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
-                   .format(model, product, atbtoken))
+            buy_what = 'buy-watch' if model.find('watch') >= 0 else 'buy-iphone'
+            url = (self.apple_host + '/shop/{}/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
+                   .format(buy_what, model, product, atbtoken))
             headers = self.get_common_request_header()
             self.last_response = self.session.get(url, headers=headers, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
                 print("添加商品到购物包失败，错误是：{}".format(self.last_response))
                 return False
             else:
-                if 'Location' in self.last_response.headers and self.last_response.headers['Location'].find('step=attach') > 0:
+                if ('Location' in self.last_response.headers and
+                        (self.last_response.headers['Location'].find('step=attach') > 0) or
+                        self.last_response.headers['Location'].find('step=watchattach') > 0):
                     self.cookies.update(self.last_response.cookies.get_dict())
                     return True
                 else:
@@ -412,8 +417,60 @@ class AppleUtil:
             print("选择自提失败，错误是：{}".format(e))
             return False
 
+    # 查询可提货日期和时间，返回（success, date string, time json object）
+    def fulfillment_pickup_datetime(self, x_aos_stk, data_model):
+        error = (False, '', None)
+        try:
+            url = self.appstore_host + '/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Fulfillment-init'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+            body = ('checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore={}&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput={}'
+                    .format(data_model.store, data_model.store_postal_code))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("查询可提货日期和时间失败，错误是：{}".format(self.last_response))
+                return error
+
+            data = self.last_response.content.decode('utf-8')
+            root = json.loads(data)
+            pickup = root['body']['checkout']['fulfillment']['pickupTab']['pickup']
+            if 'timeSlot' not in pickup:
+                print('不需要选择提货时间')
+                return True, '', None
+
+            pickup_datetime = pickup['timeSlot']['dateTimeSlots']['d']
+            pickup_dates = pickup_datetime['pickUpDates']
+            if len(pickup_dates) == 0:
+                print("查询可提货日期和时间失败，错误是：没有可买的日期")
+                return error
+            pickup_date = pickup_dates[random.randint(0, len(pickup_dates)-1)]
+            day = pickup_date['dayOfMonth']
+            pickup_times = pickup_datetime['timeSlotWindows']
+            selected_pickup_times = None
+            for pickup_time in pickup_times:
+                if day in pickup_time:
+                    selected_pickup_times = pickup_time[day]
+                    break
+            if selected_pickup_times is None:
+                print("查询可提货日期和时间失败，错误是：找不到可提货的时间")
+                return error
+            selected_pickup_time = selected_pickup_times[random.randint(0, len(selected_pickup_times)-1)]
+            selected_pickup_date = pickup_date['date']
+
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True, selected_pickup_date, selected_pickup_time
+        except Exception as e:
+            print("查询可提货日期和时间失败，错误是：{}".format(e))
+            return error
+
     # 自提选择店铺
-    def fulfillment_store(self, x_aos_stk, data_model):
+    # date, 如 2024-09-20
+    def fulfillment_store(self, x_aos_stk, data_model, pickup_date, pickup_time):
         try:
             url = self.appstore_host + '/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment'
             headers = self.get_common_request_header()
@@ -422,8 +479,36 @@ class AppleUtil:
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
-            body = ('checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL&checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore={}&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput={}'
-                    .format(data_model.store, data_model.postal_code))
+
+            body = {
+                'checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation': 'RETAIL',
+                'checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores': 'false',
+                'checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore': data_model.store,
+                'checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput': data_model.store_postal_code
+            }
+
+            if pickup_time:
+                body_time = {
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.startTime': pickup_time['checkInStart'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.endTime': pickup_time['checkInEnd'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.date': pickup_date,
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayEndTime': '',
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotType': '',
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRecommended': 'false',
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotId': pickup_time['SlotId'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.signKey': pickup_time['signKey'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeZone': pickup_time['timeZone'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotValue': pickup_time['timeSlotValue'],
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRestricted': 'false',
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayStartTime': '',
+                    'checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.dayRadio': ''
+                }
+                body.update(body_time)
+
+            body = '&'.join(
+                f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
+                for k, v in body.items())
+
             self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
                 print("选择店铺失败，错误是：{}".format(self.last_response))

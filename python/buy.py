@@ -190,10 +190,20 @@ def buy(proxys, datamodel):
                 apple_util.proxies = proxy_pool.get_next_proxy()
                 print('使用代理：{}'.format(apple_util.proxies))
 
+        # 查询可购买日期和时间
+        while True:
+            print('查询可购买日期和时间')
+            success, pickup_date, pickup_time = apple_util.fulfillment_pickup_datetime(x_aos_stk, datamodel)
+            if success:
+                break
+            if need_change_proxy(apple_util.last_response):
+                apple_util.proxies = proxy_pool.get_next_proxy()
+                print('使用代理：{}'.format(apple_util.proxies))
+
         # 选择店铺
         while True:
             print('选择店铺')
-            if apple_util.fulfillment_store(x_aos_stk, datamodel):
+            if apple_util.fulfillment_store(x_aos_stk, datamodel, pickup_date, pickup_time):
                 break
             if need_change_proxy(apple_util.last_response):
                 apple_util.proxies = proxy_pool.get_next_proxy()

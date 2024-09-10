@@ -296,22 +296,16 @@
                 "name": "iPhone 16 Pro Max 1TB ブラックチタニウム"
             }
         ],
-        "iphone-15-pro": [
+        "iphone-15": [
             {
                 "code": "MTU93J",
-                "name": "iPhone 15 Pro 128GB 天然钛金"
-            },
+                "name": "iPhone 15 128GB ブルー"
+            }
+        ],
+        "apple-watch-ultra": [
             {
-                "code": "MTUQ3J",
-                "name": "iPhone 15 Pro 1TB 黑色钛金属"
-            },
-            {
-                "code": "MU6V3J",
-                "name": "iPhone 15 Pro Max 512GB 白色钛金属"
-            },
-            {
-                "code": "MU6T3J",
-                "name": "iPhone 15 Pro Max 256GB 蓝色钛金"
+                "code": "MX4F3J",
+                "name": "Apple Watch Ultra 2"
             }
         ]
     }
