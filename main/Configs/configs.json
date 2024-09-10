@@ -60,6 +60,242 @@
         }
     ],
     "phone_model": {
+        "iphone-16": [
+            {
+                "code": "MYDU3J",
+                "name": "iPhone 16 128GB ウルトラマリン"
+            },
+            {
+                "code": "MYE03J",
+                "name": "iPhone 16 256GB ウルトラマリン"
+            },
+            {
+                "code": "MYE53J",
+                "name": "iPhone 16 512GB ウルトラマリン"
+            },
+            {
+                "code": "MYDV3J",
+                "name": "iPhone 16 128GB ティール"
+            },
+            {
+                "code": "MYE13J",
+                "name": "iPhone 16 256GB ティール"
+            },
+            {
+                "code": "MYE63J",
+                "name": "iPhone 16 512GB ティール"
+            },            
+            {
+                "code": "MYDT3J",
+                "name": "iPhone 16 128GB ピンク"
+            },
+            {
+                "code": "MYDY3J",
+                "name": "iPhone 16 256GB ピンク"
+            },
+            {
+                "code": "MYE43J",
+                "name": "iPhone 16 512GB ピンク"
+            },            
+            {
+                "code": "MYDR3J",
+                "name": "iPhone 16 128GB ホワイト"
+            },
+            {
+                "code": "MYDX3J",
+                "name": "iPhone 16 256GB ホワイト"
+            },
+            {
+                "code": "MYE33J",
+                "name": "iPhone 16 512GB ホワイト"
+            },
+            {
+                "code": "MYDQ3J",
+                "name": "iPhone 16 128GB ブラック"
+            },
+            {
+                "code": "MYDW3J",
+                "name": "iPhone 16 256GB ブラック"
+            },
+            {
+                "code": "MYE23J",
+                "name": "iPhone 16 512GB ブラック"
+            },
+            {
+                "code": "MXVA3J",
+                "name": "iPhone 16 Plus 128GB ブラック"
+            },
+            {
+                "code": "MXVG3J",
+                "name": "iPhone 16 Plus 256GB ブラック"
+            },
+            {
+                "code": "MXVN3J",
+                "name": "iPhone 16 Plus 512GB ブラック"
+            },
+            {
+                "code": "MXVC3J",
+                "name": "iPhone 16 Plus 128GB ホワイト"
+            },
+            {
+                "code": "MXVH3J",
+                "name": "iPhone 16 Plus 256GB ホワイト"
+            },
+            {
+                "code": "MXVP3J",
+                "name": "iPhone 16 Plus 512GB ホワイト"
+            },
+            {
+                "code": "MXVD3J",
+                "name": "iPhone 16 Plus 128GB ピンク"
+            },
+            {
+                "code": "MXVJ3J",
+                "name": "iPhone 16 Plus 256GB ピンク"
+            },
+            {
+                "code": "MXVQ3J",
+                "name": "iPhone 16 Plus 512GB ピンク"
+            },
+            {
+                "code": "MXVF3J",
+                "name": "iPhone 16 Plus 128GB ティール"
+            },
+            {
+                "code": "MXVL3J",
+                "name": "iPhone 16 Plus 256GB ティール"
+            },
+            {
+                "code": "MXVT3J",
+                "name": "iPhone 16 Plus 512GB ティール"
+            },
+            {
+                "code": "MXVE3J",
+                "name": "iPhone 16 Plus 128GB ウルトラマリン"
+            },
+            {
+                "code": "MXVK3J",
+                "name": "iPhone 16 Plus 256GB ウルトラマリン"
+            },
+            {
+                "code": "MXVR3J",
+                "name": "iPhone 16 Plus 512GB ウルトラマリン"
+            }
+        ],
+        "iphone-16-pro": [
+            {
+                "code": "MYMX3J",
+                "name": "iPhone 16 Pro 128GB デザートチタニウム"
+            },
+            {
+                "code": "MYN23J",
+                "name": "iPhone 16 Pro 256GB デザートチタニウム"
+            },
+            {
+                "code": "MYN63J",
+                "name": "iPhone 16 Pro 512GB デザートチタニウム"
+            },
+            {
+                "code": "MYNA3J",
+                "name": "iPhone 16 Pro 1TB デザートチタニウム"
+            },
+            {
+                "code": "MYMY3J",
+                "name": "iPhone 16 Pro 128GB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYN33J",
+                "name": "iPhone 16 Pro 256GB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYN73J",
+                "name": "iPhone 16 Pro 512GB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYNC3J",
+                "name": "iPhone 16 Pro 1TB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYMW3J",
+                "name": "iPhone 16 Pro 128GB ホワイトチタニウム"
+            },
+            {
+                "code": "MYN13J",
+                "name": "iPhone 16 Pro 256GB ホワイトチタニウム"
+            },
+            {
+                "code": "MYN53J",
+                "name": "iPhone 16 Pro 512GB ホワイトチタニウム"
+            },
+            {
+                "code": "MYN93J",
+                "name": "iPhone 16 Pro 1TB ホワイトチタニウム"
+            },
+            {
+                "code": "MYMV3J",
+                "name": "iPhone 16 Pro 128GB ブラックチタニウム"
+            },
+            {
+                "code": "MYN03J",
+                "name": "iPhone 16 Pro 256GB ブラックチタニウム"
+            },
+            {
+                "code": "MYN43J",
+                "name": "iPhone 16 Pro 512GB ブラックチタニウム"
+            },
+            {
+                "code": "MYN83J",
+                "name": "iPhone 16 Pro 1TB ブラックチタニウム"
+            },
+            {
+                "code": "MYWJ3J",
+                "name": "iPhone 16 Pro Max 256GB デザートチタニウム"
+            },
+            {
+                "code": "MYWN3J",
+                "name": "iPhone 16 Pro Max 512GB デザートチタニウム"
+            },
+            {
+                "code": "MYWT3J",
+                "name": "iPhone 16 Pro Max 1TB デザートチタニウム"
+            },
+            {
+                "code": "MYWK3J",
+                "name": "iPhone 16 Pro Max 256GB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYWP3J",
+                "name": "iPhone 16 Pro Max 512GB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYWU3J",
+                "name": "iPhone 16 Pro Max 1TB ナチュラルチタニウム"
+            },
+            {
+                "code": "MYWH3J",
+                "name": "iPhone 16 Pro Max 256GB ホワイトチタニウム"
+            },
+            {
+                "code": "MYWM3J",
+                "name": "iPhone 16 Pro Max 512GB ホワイトチタニウム"
+            },
+            {
+                "code": "MYWR3J",
+                "name": "iPhone 16 Pro Max 1TB ホワイトチタニウム"
+            },
+            {
+                "code": "MYWG3J",
+                "name": "iPhone 16 Pro Max 256GB ブラックチタニウム"
+            },
+            {
+                "code": "MYWL3J",
+                "name": "iPhone 16 Pro Max 512GB ブラックチタニウム"
+            },
+            {
+                "code": "MYWQ3J",
+                "name": "iPhone 16 Pro Max 1TB ブラックチタニウム"
+            }
+        ],
         "iphone-15-pro": [
             {
                 "code": "MTU93J",
