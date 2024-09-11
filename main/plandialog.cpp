@@ -105,7 +105,7 @@ void PlanDialog::updateCtrls()
    else
    {
        ui->fixTimeCheckBox->setChecked(false);
-       QDateTime now = QDateTime::currentDateTime();
+       QDateTime now = QDateTime(QDate(2024,9,13), QTime(20, 0));
        QTimeZone desiredTimeZone("Asia/Shanghai");
        now.setTimeZone(desiredTimeZone);
        ui->fixDateTimeEdit->setDateTime(now);
