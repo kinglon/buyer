@@ -69,7 +69,7 @@ def get_proxy_server_list(proxy_region):
     no_proxy_server = {"http": "", "https": ""}
     error = (False, [], '')
     try:
-        url = ("http://api.proxy.ipidea.io/getBalanceProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
+        url = ("http://api.proxy.ipidea.io/getProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
                .format(proxy_region))
         response = requests.get(url, proxies=no_proxy_server, timeout=10)
         if not response.ok:
@@ -462,6 +462,7 @@ def main():
         success, proxy_server_list, message = get_proxy_server_list('jp')
         if not success or len(proxy_server_list) == 0:
             continue
+        print('获取代理IP列表: {}'.format(len(proxy_server_list)))
         break
 
     if len(proxy_server_list) == 0:

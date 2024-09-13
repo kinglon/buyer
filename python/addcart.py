@@ -20,7 +20,7 @@ def get_proxy_server_list(proxy_region):
     no_proxy_server = {"http": "", "https": ""}
     error = (False, [], '')
     try:
-        url = ("http://api.proxy.ipidea.io/getBalanceProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
+        url = ("http://api.proxy.ipidea.io/getProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
                .format(proxy_region))
         response = requests.get(url, proxies=no_proxy_server, timeout=10)
         if not response.ok:
