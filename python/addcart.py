@@ -38,7 +38,7 @@ def get_proxy_server_list(proxy_region):
         return error
 
 
-def add_cart(proxys, users, local_ips, phone_model):
+def add_cart(proxys, users, local_ips, phone_model, recommended_item):
     for i in range(len(users)):
         account = users[i]['account']
         password = users[i]['password']
@@ -82,112 +82,135 @@ def add_cart(proxys, users, local_ips, phone_model):
         # 添加商品
         model = phone_model['model']
         code = phone_model['phone_code']
-        error_message = ''
+        success = False
         for j in range(max_retry_count):
             print('加入购物包: {}, {}'.format(model, code))
             if not apple_util.add_cart(model, code):
-                error_message = '加入购物包失败: {}, {}'.format(model, code)
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '加入购物包失败: {}, {}'.format(model, code)
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
-        # 打开购物车
-        error_message = ''
+        # 打开购物袋
+        success = False
         x_aos_stk = ''
         for j in range(max_retry_count):
             print('打开购物包')
             x_aos_stk = apple_util.open_cart()
             if x_aos_stk is None:
-                error_message = '打开购物包失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '打开购物包失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
+        # 添加配件
+        if len(recommended_item) > 0:
+            success = False
+            for j in range(max_retry_count):
+                print('添加配件')
+                if not apple_util.add_recommended_item(recommended_item, x_aos_stk):
+                    continue
+                success = True
+                break
+            if not success:
+                error_message = '添加配件失败'
+                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+                continue
+            time.sleep(Setting.get().request_interval)
+
         # 进入购物流程
-        error_message = ''
+        success = False
         ssi = ''
         for j in range(max_retry_count):
             print('进入购物流程')
             ssi = apple_util.checkout_now(x_aos_stk)
             if ssi is None:
-                error_message = '进入购物流程失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '进入购物流程失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
         # 登录
-        error_message = ''
+        success = False
         for j in range(max_retry_count):
             print('登录账号')
             if not apple_util.login(account, password):
-                error_message = '登录账号失败：{}, {}'.format(account, password)
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '登录账号失败：{}, {}'.format(account, password)
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
         # 绑定账号
-        error_message = ''
+        success = False
         pltn = ''
         for j in range(max_retry_count):
             print('绑定账号')
             pltn = apple_util.bind_account(x_aos_stk, ssi)
             if pltn is None:
-                error_message = '绑定账号失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '绑定账号失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
         # 开始下单
-        error_message = ''
+        success = False
         for j in range(max_retry_count):
             print('开始下单')
             if not apple_util.checkout_start(pltn):
-                error_message = '开始下单失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '开始下单失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
         # 进入下单页面
-        error_message = ''
+        success = False
         for j in range(max_retry_count):
             print('进入下单页面')
             x_aos_stk = apple_util.checkout()
             if x_aos_stk is None:
-                error_message = '进入下单页面失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '进入下单页面失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
 
         # 选择自提
-        error_message = ''
+        success = False
         for j in range(max_retry_count):
             print('选择自提')
             if not apple_util.fulfillment_retail(x_aos_stk):
-                error_message = '选择自提失败'
                 continue
+            success = True
             break
-        if len(error_message) > 0:
+        if not success:
+            error_message = '选择自提失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
 
@@ -235,6 +258,7 @@ def main():
             use_proxy = root['use_proxy']
             thread_num = root['thread_num']
             phone_model = root['phone_model']
+            recommended_item = root['recommended_item']
             proxy_region = root['proxy_region']
             users = root['user']
         if len(users) == 0:
@@ -275,7 +299,7 @@ def main():
                 local_ip = local_ips[i * proxy_count_per_thread:]
             if len(local_ip) == 0:
                 local_ip.append(local_ips[0])
-            args = (proxy, user, local_ip, phone_model)
+            args = (proxy, user, local_ip, phone_model, recommended_item)
             thread = threading.Thread(target=add_cart, args=args)
             thread.start()
             threads.append(thread)

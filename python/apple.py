@@ -21,7 +21,7 @@ class AppleUtil:
         self.proxies = {"http": "", "https": ""}
         self.cookies = {}
         self.debug_cookie = ''
-        self.timeout = 10
+        self.timeout = 20
         self.session = requests.Session()
 
         # 最后一个响应
@@ -287,6 +287,34 @@ class AppleUtil:
         except Exception as e:
             print("打开购物包失败，错误是：{}".format(e))
             return None
+
+    # 添加配件
+    # 返回 is success
+    def add_recommended_item(self, item_skuid, x_aos_stk):
+        try:
+            url = self.apple_host + '/shop/bagx?_a=addToCart&_m=shoppingCart.recommendations.recommendedItem'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'cart'
+            body = 'shoppingCart.recommendations.recommendedItem.part={}%2FA'.format(item_skuid)
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("添加配件失败，错误是：{}".format(self.last_response))
+                return False
+            else:
+                self.cookies.update(self.last_response.cookies.get_dict())
+                data = self.last_response.content.decode('utf-8')
+                root = json.loads(data)
+                status = root['head']['status']
+                if status == 200:
+                    return True
+                print("添加配件失败，错误是：{}".format(status))
+                return False
+        except Exception as e:
+            print("添加配件失败，错误是：{}".format(e))
+            return False
 
     # 进入下单流程
     # 返回ssi
@@ -580,7 +608,7 @@ class AppleUtil:
                 'checkout.locationConsent.locationConsent': 'false'
             }
             body = '&'.join(
-                f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
+                f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
                 for k, v in body.items())
 
             self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
@@ -714,7 +742,7 @@ class AppleUtil:
                 'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID': 'TF1;015;;;;;;;;;;;;;;;;;;;;;;Mozilla;Netscape;5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;20030107;undefined;true;;true;Win32;undefined;Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;zh-CN;undefined;secure6.store.apple.com;undefined;undefined;undefined;undefined;false;false;1719667606222;8;2005/6/7%2021%3A33%3A44;1366;768;;;;;;;;-480;-480;2024/6/29%2021%3A26%3A46;24;1366;728;0;0;;;;;;;;;;;;;;;;;;;25;',
                 'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': ''
             }
-            body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}' for k, v in body.items())
+            body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}' for k, v in body.items())
 
             self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
@@ -732,7 +760,7 @@ class AppleUtil:
             print("输入账单地址失败，错误是：{}".format(e))
             return False
 
-    # 支付（一步到位）
+    # 信用卡支付（一步到位）
     def billing(self, x_aos_stk, data_model):
         try:
             url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing'
@@ -770,7 +798,7 @@ class AppleUtil:
                 'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': ''
             }
             body = '&'.join(
-                f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
+                f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
                 for k, v in body.items())
 
             self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
@@ -787,6 +815,91 @@ class AppleUtil:
             return True
         except Exception as e:
             print("支付失败，错误是：{}".format(e))
+            return False
+
+    # 使用礼品卡
+    def use_giftcard(self, x_aos_stk, data_model):
+        try:
+            url = self.appstore_host + '/shop/checkoutx/billing?_a=applyGiftCard&_m=checkout.billing'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            # 礼品卡号，每4个字符加个空格
+            giftcard_no = ''
+            for i in range(len(data_model.giftcard_no)):
+                if i % 4 == 0 and len(giftcard_no) > 0:
+                    giftcard_no += '%20'
+                giftcard_no += data_model.giftcard_no[i]
+
+            body = {
+                'checkout.billing.billingOptions.selectBillingOption': '',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID': 'TF1;015;;;;;;;;;;;;;;;;;;;;;;Mozilla;Netscape;5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;20030107;undefined;true;;true;Win32;undefined;Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;zh-CN;undefined;secure6.store.apple.com;undefined;undefined;undefined;undefined;false;false;1719667606222;8;2005/6/7%2021%3A33%3A44;1366;768;;;;;;;;-480;-480;2024/6/29%2021%3A26%3A46;24;1366;728;0;0;;;;;;;;;;;;;;;;;;;25;',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': giftcard_no
+            }
+            body = '&'.join(
+                f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
+                for k, v in body.items())
+
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("使用礼品卡失败，错误是：{}".format(self.last_response))
+                return False
+
+            # 失败的话不是Json串，抛异常表示返回失败
+            data = self.last_response.content.decode('utf-8')
+            json.loads(data)
+
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True
+        except Exception as e:
+            print("使用礼品卡失败，错误是：{}".format(e))
+            return False
+
+    # 礼品卡支付，填写账单信息
+    def billing_by_giftcard(self, x_aos_stk, data_model):
+        try:
+            url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            body = {
+                'checkout.billing.billingOptions.selectBillingOption': '',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.city': data_model.city,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.state': data_model.state,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.lastName': data_model.last_name,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.firstName': data_model.first_name,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.countryCode': 'JP',
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.street': data_model.street,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.postalCode': data_model.postal_code,
+                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.street2': data_model.street2,
+            }
+            body = '&'.join(
+                f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
+                for k, v in body.items())
+
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("礼品卡支付失败，错误是：{}".format(self.last_response))
+                return False
+
+            # 失败的话不是Json串，抛异常表示返回失败
+            data = self.last_response.content.decode('utf-8')
+            root = json.loads(data)
+            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
+
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True
+        except Exception as e:
+            print("礼品卡支付失败，错误是：{}".format(e))
             return False
 
     # 确认下单

@@ -59,21 +59,25 @@ def test_v2():
     data_model.city = 'Fuzhou'
     data_model.street = 'Changshan'
     data_model.street2 = 'Zhaixianyuan'
-    data_model.giftcard_no = ''
+    data_model.giftcard_no = 'XFWK2FVCHT89Z9PF'
 
     # 添加商品
     model = 'iphone-15'
     product = 'MTML3J'
-    # model = 'apple-watch-ultra'
-    # product = 'MX4F3J'
     # model = 'iphone-16'
-    # product = 'MYDU3J'
+    # product = 'MYDU3J'  # iPhone 16 128GB
+    # product = 'MYWP3J'  # iPhone 16 Pro Max 512GB
+    recommended_item = 'MWVV3AM'  # 20W 充电器
     if not apple_util.add_cart(model, product):
         return
 
-    # 打开购物车
+    # 打开购物袋
     x_aos_stk = apple_util.open_cart()
     if x_aos_stk is None:
+        return
+
+    # 添加配件
+    if not apple_util.add_recommended_item(recommended_item, x_aos_stk):
         return
 
     # 进入购物流程
@@ -120,9 +124,17 @@ def test_v2():
     if not apple_util.pickup_contact(x_aos_stk, data_model):
         return
 
-    # 输入账单，支付
-    if not apple_util.billing(x_aos_stk, data_model):
-        return
+    if len(data_model.giftcard_no) == 0:
+        # 信用卡支付
+        if not apple_util.billing(x_aos_stk, data_model):
+            return
+    else:
+        # 礼品卡支付
+        if not apple_util.use_giftcard(x_aos_stk, data_model):
+            return
+
+        if not apple_util.billing_by_giftcard(x_aos_stk, data_model):
+            return
 
     # 确认下单
     if not apple_util.review(x_aos_stk):
