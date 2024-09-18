@@ -4,16 +4,16 @@
 #include <QThread>
 #include <QObject>
 #include <QDateTime>
+#include <QJsonObject>
 #include "httpthread.h"
 #include "datamodel.h"
 
 // 购买步骤
-#define STEP_FULFILLMENT_STORE  6   // 选择店铺
-#define STEP_PICKUP_CONTACT     7   // 选择联系人
-#define STEP_BILLING            8   // 支付
-#define STEP_REVIEW             9   // 确认订单
-#define STEP_PROCESS            10  // 处理订单
-#define STEP_QUERY_ORDER_NO     11  // 查询订单号
+#define STEP_QUERY_DATETIME     1   // 查询领取日期和时间
+#define STEP_SELECT_SHOP        2   // 重新选择店铺
+#define STEP_REVIEW             3   // 确认订单
+#define STEP_PROCESS            4   // 处理订单
+#define STEP_QUERY_ORDER_NO     5   // 查询订单号
 
 class BuyParam
 {
@@ -54,7 +54,7 @@ public:
     QString m_orderNo;
 
     // 步骤
-    int m_currentStep = STEP_FULFILLMENT_STORE;
+    int m_currentStep = STEP_QUERY_DATETIME;
 
     // 每个步骤的耗时，毫秒数
     QVector<QString> m_takeTimes;
@@ -80,17 +80,13 @@ public:
 public:
     QString getStepName() const
     {
-        if (m_currentStep == STEP_FULFILLMENT_STORE)
+        if (m_currentStep == STEP_QUERY_DATETIME)
         {
-            return QString::fromWCharArray(L"选择店铺");
+            return QString::fromWCharArray(L"查询领取日期和时间");
         }
-        else if (m_currentStep == STEP_PICKUP_CONTACT)
+        else if (m_currentStep == STEP_SELECT_SHOP)
         {
-            return QString::fromWCharArray(L"选择联系人");
-        }
-        else if (m_currentStep == STEP_BILLING)
-        {
-            return QString::fromWCharArray(L"支付");
+            return QString::fromWCharArray(L"重新选择店铺");
         }
         else if (m_currentStep == STEP_REVIEW)
         {
@@ -128,6 +124,12 @@ public:
 
     // pltn
     QString m_pltn;
+
+    // 领取日期
+    QString m_date;
+
+    // 领取时间
+    QJsonObject m_time;
 };
 
 class GoodsBuyer : public HttpThread
@@ -159,7 +161,9 @@ private:
 
     void handleResponse(CURL* curl);
 
-    // 处理中，返回true表示已经处理完成
+    void handleQueryDateTimeResponse(BuyUserData* userData, QString& responseData);
+
+    // 处理中，返回true表示已经处理完成(BuyUserData* userData, QString& responseData);
     bool handleProcessResponse(BuyUserData* userData, QString& responseData);
 
     bool handleQueryOrderResponse(BuyUserData* userData, QString& responseData);

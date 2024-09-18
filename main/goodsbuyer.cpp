@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QUrlQuery>
+#include <QRandomGenerator>
 #include "settingmanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
@@ -27,13 +28,13 @@ void GoodsBuyer::run()
         emit buyFinish(this, nullptr);
     }
 
-    // 初始化每个购买流程，从选择店铺步骤开始
+    // 初始化每个购买流程
     int64_t beginTime = GetTickCount64();
     for (int i=0; i<m_buyParams.size(); i++)
     {
         BuyUserData* userData = new BuyUserData();
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
-        userData->m_buyResult.m_currentStep = STEP_FULFILLMENT_STORE;
+        userData->m_buyResult.m_currentStep = STEP_QUERY_DATETIME;
         userData->m_buyResult.m_localIp = m_buyParams[i].m_localIp;
         userData->m_buyParam = m_buyParams[i];
         QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
@@ -154,8 +155,31 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     headers["Modelversion"] = "v2";
 
     CURL* curl = nullptr;
-    if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
+    if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
+        headers["X-Aos-Model-Page"] = "checkoutPage";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Fulfillment-init";
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+        if (curl)
+        {
+            QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=%1&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
+                    .arg(userData->m_buyParam.m_buyingShop.m_storeNumber, userData->m_buyParam.m_buyingShop.m_postalCode);
+            setPostMethod(curl, body);
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
+    {
+        qInfo("[%s] select shop, id=%s, postal code=%s",
+              userData->m_buyResult.m_account.toStdString().c_str(),
+              userData->m_buyParam.m_buyingShop.m_storeNumber.toStdString().c_str(),
+              userData->m_buyParam.m_buyingShop.m_postalCode.toStdString().c_str());
+
         QString url = userData->m_buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -167,73 +191,52 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
         if (curl)
         {
-            QString body = QString("checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation=RETAIL&checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=%1&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
-                    .arg(userData->m_buyParam.m_buyingShop.m_storeNumber, userData->m_buyParam.m_buyingShop.m_postalCode);
-            setPostMethod(curl, body);
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
-    {
-        QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx?_a=continueFromPickupContactToBilling&_m=checkout.pickupContact");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
-                + "/shop/checkout?_s=PickupContact-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
-        if (curl)
-        {
             QMap<QString, QString> body;
-            body["checkout.pickupContact.pickupContactOptions.selectedPickupOption"] = "SELF";
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.emailAddress"] = userData->m_buyParam.m_user.m_email;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.lastName"] = userData->m_buyParam.m_user.m_firstName;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.firstName"] = userData->m_buyParam.m_user.m_lastName;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.mobilePhone"] = userData->m_buyParam.m_user.m_telephone;
-            body["checkout.pickupContact.selfPickupContact.selfContact.address.isDaytimePhoneSelected"] = "false";
-
-            QString bodyData = getBodyString(body);
-            setPostMethod(curl, bodyData);
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_BILLING)
-    {
-        QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
-                + "/shop/checkout?_s=Billing-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
-        if (curl)
-        {
-            QString creditCardPrefix;
-            QString creditCardCipher;
-            getCreditCardInfo(userData->m_buyParam.m_user.m_creditCardNo, creditCardPrefix, creditCardCipher);
-
-            QMap<QString, QString> body;
-            body["checkout.billing.billingOptions.selectBillingOption"] = "CREDIT";
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber"] = "true";
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection"] = creditCardPrefix;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType"] = "MASTERCARD";
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode"] = userData->m_buyParam.m_user.m_cvv;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration"] = userData->m_buyParam.m_user.m_expiredDate;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber"] = creditCardCipher;
-            body["checkout.locationConsent.locationConsent"] = "false";
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.city"] = userData->m_buyParam.m_user.m_city;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.state"] = userData->m_buyParam.m_user.m_state;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.lastName"] = userData->m_buyParam.m_user.m_lastName;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.firstName"] = userData->m_buyParam.m_user.m_firstName;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.countryCode"] = "JP";
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street"] = userData->m_buyParam.m_user.m_street;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.postalCode"] = userData->m_buyParam.m_user.m_postalCode;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street2"] = userData->m_buyParam.m_user.m_street2;
-            body["checkout.billing.billingOptions.selectedBillingOptions.creditCard.creditInstallment.selectedInstallment"] = "1";
-            body["checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID"] = "TF1;015;;;;;;;;;;;;;;;;;;;;;;Mozilla;Netscape;5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;20030107;undefined;true;;true;Win32;undefined;Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;zh-CN;undefined;secure6.store.apple.com;undefined;undefined;undefined;undefined;false;false;1719667606222;8;2005/6/7%2021%3A33%3A44;1366;768;;;;;;;;-480;-480;2024/6/29%2021%3A26%3A46;24;1366;728;0;0;;;;;;;;;;;;;;;;;;;25;";
-            body["checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard"] = "";
+            body["checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation"] = "RETAIL";
+            body["checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores"] = "false";
+            body["checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore"] = userData->m_buyParam.m_buyingShop.m_storeNumber;
+            body["checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput"] = userData->m_buyParam.m_buyingShop.m_postalCode;
+            if (!userData->m_date.isEmpty())
+            {
+                QJsonObject& timeObj = userData->m_time;
+                if (timeObj.contains("checkInStart"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.startTime"]
+                            = timeObj["checkInStart"].toString();
+                }
+                if (timeObj.contains("checkInEnd"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.endTime"]
+                            = timeObj["checkInEnd"].toString();
+                }
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.date"] = userData->m_date;
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayEndTime"] = "";
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotType"] = "";
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRecommended"] = "false";
+                if (timeObj.contains("SlotId"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotId"]
+                            = timeObj["SlotId"].toString();
+                }
+                if (timeObj.contains("signKey"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.signKey"]
+                            = timeObj["signKey"].toString();
+                }
+                if (timeObj.contains("timeZone"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeZone"]
+                            = timeObj["timeZone"].toString();
+                }
+                if (timeObj.contains("timeSlotValue"))
+                {
+                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotValue"]
+                            = timeObj["timeSlotValue"].toString();
+                }
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRestricted"] = "false";
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayStartTime"] = "";
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayStartTime"] = "";
+            }
             QString bodyData = getBodyString(body);
             setPostMethod(curl, bodyData);
         }
@@ -288,10 +291,8 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyParam.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
 
-    if (SettingManager::getInstance()->m_enableDebug)
-    {
-        qInfo("begin to send request %d", userData->m_buyResult.m_currentStep);
-    }
+    qInfo("[%s] begin to send request %d", userData->m_buyResult.m_account.toStdString().c_str(),
+          userData->m_buyResult.m_currentStep);
 
     return curl;
 }
@@ -305,10 +306,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
         return;
     }
 
-    if (SettingManager::getInstance()->m_enableDebug)
-    {
-        qInfo("receive the response of request %d", userData->m_buyResult.m_currentStep);
-    }
+    qInfo("[%s] receive the response of request %d", userData->m_buyResult.m_account.toStdString().c_str(),
+          userData->m_buyResult.m_currentStep);
 
     if (userData->m_buyResult.m_currentStep <= STEP_REVIEW)
     {
@@ -350,15 +349,29 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
 
     bool canNextStep = true;
-    if (userData->m_buyResult.m_currentStep == STEP_FULFILLMENT_STORE)
+    if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
-        userData->m_buyResult.m_currentStep = STEP_PICKUP_CONTACT;
+        handleQueryDateTimeResponse(userData, responseData);
+
+        QString checkInStart;
+        QString checkInEnd;
+        if (userData->m_time.contains("checkInStart"))
+        {
+            checkInStart = userData->m_time["checkInStart"].toString();
+        }
+        if (userData->m_time.contains("checkInEnd"))
+        {
+            checkInEnd = userData->m_time["checkInEnd"].toString();
+        }
+        qInfo("[%s] query datetime result, date=%s, time start=%s, time end=%s",
+              userData->m_buyResult.m_account.toStdString().c_str(),
+              userData->m_date.toStdString().c_str(),
+              checkInStart.toStdString().c_str(),
+              checkInEnd.toStdString().c_str());
+
+        userData->m_buyResult.m_currentStep = STEP_SELECT_SHOP;
     }
-    else if (userData->m_buyResult.m_currentStep == STEP_PICKUP_CONTACT)
-    {
-        userData->m_buyResult.m_currentStep = STEP_BILLING;
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_BILLING)
+    else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
         userData->m_buyResult.m_currentStep = STEP_REVIEW;
     }
@@ -411,6 +424,113 @@ void GoodsBuyer::handleResponse(CURL* curl)
     {
         m_buyResults.append(userData->m_buyResult);
         delete userData;
+    }
+}
+
+void GoodsBuyer::handleQueryDateTimeResponse(BuyUserData* userData, QString& responseData)
+{
+    QByteArray jsonData = responseData.toUtf8();
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        qCritical("failed to parse the query date time response data");
+        return;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    if (!root.contains("body"))
+    {
+        return;
+    }
+    QJsonObject bodyJson = root["body"].toObject();
+
+    if (!bodyJson.contains("checkout"))
+    {
+        return;
+    }
+    QJsonObject checkoutJson = bodyJson["checkout"].toObject();
+
+    if (!checkoutJson.contains("fulfillment"))
+    {
+        return;
+    }
+    QJsonObject fulfillmentJson = checkoutJson["fulfillment"].toObject();
+
+    if (!fulfillmentJson.contains("pickupTab"))
+    {
+        return;
+    }
+    QJsonObject pickupTabJson = fulfillmentJson["pickupTab"].toObject();
+
+    if (!pickupTabJson.contains("pickup"))
+    {
+        return;
+    }
+    QJsonObject pickupJson = pickupTabJson["pickup"].toObject();
+
+    if (!pickupJson.contains("timeSlot"))
+    {
+        qInfo("not need to select datetime");
+        return;
+    }
+    QJsonObject timeSlotJson = pickupJson["timeSlot"].toObject();
+
+    if (!timeSlotJson.contains("dateTimeSlots"))
+    {
+        return;
+    }
+    QJsonObject dateTimeSlotsJson = timeSlotJson["dateTimeSlots"].toObject();
+
+    if (!dateTimeSlotsJson.contains("d"))
+    {
+        return;
+    }
+    QJsonObject dJson = dateTimeSlotsJson["d"].toObject();
+
+    if (!dJson.contains("pickUpDates"))
+    {
+        return;
+    }
+    QJsonArray pickUpDatesJson = dJson["pickUpDates"].toArray();
+    if (pickUpDatesJson.size() == 0)
+    {
+        qCritical("not have any date to buy");
+        return;
+    }
+
+    int randomNumber = QRandomGenerator::global()->bounded(pickUpDatesJson.size());
+    QJsonObject pickUpDateJson = pickUpDatesJson[randomNumber].toObject();
+    if (pickUpDateJson.contains("date"))
+    {
+        userData->m_date = pickUpDateJson["date"].toString();
+    }
+
+    if (!pickUpDateJson.contains("dayOfMonth"))
+    {
+        return;
+    }
+    QString day = pickUpDateJson["dayOfMonth"].toString();
+
+    if (!dJson.contains("timeSlotWindows"))
+    {
+        return;
+    }
+    QJsonArray timeSlotWindows = dJson["timeSlotWindows"].toArray();
+    for (auto timeSlotWindow : timeSlotWindows)
+    {
+        QJsonObject timeSlotWindowJson = timeSlotWindow.toObject();
+        if (timeSlotWindowJson.contains(day))
+        {
+            QJsonArray timeSlotsJson = timeSlotWindowJson[day].toArray();
+            if (timeSlotsJson.size() == 0)
+            {
+                return;
+            }
+
+            randomNumber = QRandomGenerator::global()->bounded(timeSlotsJson.size());
+            userData->m_time = timeSlotsJson[randomNumber].toObject();
+            break;
+        }
     }
 }
 

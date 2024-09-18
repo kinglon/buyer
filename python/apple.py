@@ -541,7 +541,6 @@ class AppleUtil:
 
             body = {
                 'checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation': 'RETAIL',
-                'checkout.fulfillment.pickupTab.deliveryForced.shipmentGroups.shipmentGroup-1.shipmentOptionsGroups.shipmentOptionsGroup-1.shippingOptions.selectShippingOption': shipping_option,
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores': 'false',
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore': data_model.store,
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput': data_model.store_postal_code
@@ -720,7 +719,10 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
+            page_title = AppleUtil.parse_page_title(root)
+            print('页面标题：{}'.format(page_title))
+            if page_title.find('注文の確認') == -1:                
+                return False            
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
@@ -797,7 +799,10 @@ class AppleUtil:
             # 失败的话不是Json串，抛异常表示返回失败
             data = self.last_response.content.decode('utf-8')
             root = json.loads(data)
-            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
+            page_title = AppleUtil.parse_page_title(root)
+            print('页面标题：{}'.format(page_title))
+            if page_title.find('注文の確認') == -1:                  
+                return False    
 
             self.cookies.update(self.last_response.cookies.get_dict())
             return True

@@ -35,6 +35,12 @@ void PlanDialog::initCtrls()
         ui->skuidComboBox->addItem(phoneModel.m_name, QVariant(phoneModel.m_code));
     }
 
+    ui->recommendComboBox->clear();
+    for (const auto& recommendItem : SettingManager::getInstance()->m_recommendedItems)
+    {
+        ui->recommendComboBox->addItem(recommendItem.m_name, QVariant(recommendItem.m_skuid));
+    }
+
     ui->paymentComboBox->clear();
     ui->paymentComboBox->addItem(PlanItem::getPaymentName(PAYMENT_CREDIT_CARD), QVariant(PAYMENT_CREDIT_CARD));
     ui->paymentComboBox->addItem(PlanItem::getPaymentName(PAYMENT_GIFT_CARD), QVariant(PAYMENT_GIFT_CARD));
@@ -69,6 +75,20 @@ void PlanDialog::updateCtrls()
            if (itemData.toString() == m_planItem.m_phoneCode)
            {
                ui->skuidComboBox->setCurrentIndex(i);
+               break;
+           }
+       }
+   }
+
+   ui->recommendComboBox->setCurrentIndex(-1);
+   if (!m_planItem.m_recommendedSkuid.isEmpty())
+   {
+       for (int i = 0; i < ui->recommendComboBox->count(); i++)
+       {
+           QVariant itemData = ui->recommendComboBox->itemData(i);
+           if (itemData.toString() == m_planItem.m_recommendedSkuid)
+           {
+               ui->recommendComboBox->setCurrentIndex(i);
                break;
            }
        }
@@ -147,6 +167,19 @@ void PlanDialog::onOkBtn()
     if (m_planItem.m_phoneCode.isEmpty())
     {
         UiUtil::showTip(QString::fromWCharArray(L"skuid不能为空"));
+        return;
+    }
+
+    m_planItem.m_recommendedSkuid = "";
+    int reSkuidSelIndex = ui->recommendComboBox->currentIndex();
+    if (reSkuidSelIndex >= 0)
+    {
+        QVariant itemData = ui->recommendComboBox->itemData(reSkuidSelIndex);
+        m_planItem.m_recommendedSkuid = itemData.toString();
+    }
+    if (m_planItem.m_recommendedSkuid.isEmpty())
+    {
+        UiUtil::showTip(QString::fromWCharArray(L"配件未选择"));
         return;
     }
 

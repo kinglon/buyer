@@ -41,4 +41,7 @@ public:
 
     // 机型列表
     QVector<PhoneModel> m_phoneModels;
+
+    // 配件列表
+    QVector<RecommendedItem> m_recommendedItems;
 };

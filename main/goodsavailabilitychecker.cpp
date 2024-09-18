@@ -303,7 +303,12 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
             }
 
             QJsonObject partsJsonObject = storeJsonObj["partsAvailability"].toObject()[parts].toObject();
-            if (!partsJsonObject.contains("pickupDisplay") || partsJsonObject["pickupDisplay"].toString() != "available")
+            if (!partsJsonObject.contains("buyability") || !partsJsonObject["buyability"].toObject().contains("isBuyable"))
+            {
+                continue;
+            }
+
+            if (!partsJsonObject["buyability"].toObject()["isBuyable"].toBool())
             {
                 continue;
             }
@@ -312,9 +317,7 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
             {
                 if (shop.m_postalCode == postalCode)
                 {
-                    ShopItem shopItem = shop;
-                    shopItem.m_storeNumber = storeNumber;
-                    shops.append(shopItem);
+                    shops.append(shop);
                     break;
                 }
             }

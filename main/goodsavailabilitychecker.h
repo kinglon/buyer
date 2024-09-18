@@ -31,6 +31,8 @@ protected:
 
     QMap<QString,QString> getCommonHeaders() override;
 
+    int getTimeOutSeconds() override { return 10; }
+
 private:
     // 获取本地IP列表
     QVector<QString> getLocalIps();

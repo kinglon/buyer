@@ -106,6 +106,9 @@ public:
     // 购买机型，机型码
     QString m_phoneCode;
 
+    // 配件skuid
+    QString m_recommendedSkuid;
+
     // 购买数量
     int m_count = 1;
 
@@ -121,7 +124,7 @@ public:
     // 定时购买的时间，秒数
     int m_fixBuyTime = 0;
 
-    // 购买店铺列表
+    // 购买店铺列表，店铺的名字，如：苹果银座
     QVector<QString> m_buyingShops;
 
     // 支付方式
@@ -188,6 +191,17 @@ public:
 
     // 型号，如 iphone-15-pro
     QString m_model;
+};
+
+// 配件
+class RecommendedItem
+{
+public:
+    // 配件名称
+    QString m_name;
+
+    // 配件skuid
+    QString m_skuid;
 };
 
 #endif // DATAMODEL_H

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>480</width>
-    <height>382</height>
+    <height>430</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>21</x>
      <y>0</y>
      <width>421</width>
-     <height>381</height>
+     <height>431</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -94,6 +94,39 @@
       </item>
       <item>
        <widget class="QComboBox" name="skuidComboBox">
+        <property name="maxVisibleItems">
+         <number>10</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_10">
+      <item>
+       <widget class="QLabel" name="label_9">
+        <property name="minimumSize">
+         <size>
+          <width>70</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>70</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>配件</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="recommendComboBox">
         <property name="maxVisibleItems">
          <number>10</number>
         </property>

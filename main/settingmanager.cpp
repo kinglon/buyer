@@ -64,6 +64,7 @@ void SettingManager::load()
         ShopItem shopItem;
         shopItem.m_name = shopJson["name"].toString();
         shopItem.m_postalCode = shopJson["postal"].toString();
+        shopItem.m_storeNumber = shopJson["id"].toString();
         m_shops.append(shopItem);
     }
 
@@ -79,5 +80,15 @@ void SettingManager::load()
             phoneModelItem.m_name = phoneModelJson.toObject()["name"].toString();
             m_phoneModels.append(phoneModelItem);
         }
+    }
+
+    QJsonObject recommendedItems = root["recommended_item"].toObject();
+    for (auto item : recommendedItems)
+    {
+        QJsonObject itemJson = item.toObject();
+        RecommendedItem recommendedItem;
+        recommendedItem.m_name = itemJson["name"].toString();
+        recommendedItem.m_skuid = itemJson["code"].toString();
+        m_recommendedItems.append(recommendedItem);
     }
 }

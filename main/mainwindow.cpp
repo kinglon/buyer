@@ -193,40 +193,7 @@ void MainWindow::onRunPlanBtn(QString planId)
     if (plan == nullptr)
     {
         return;
-    }    
-
-    if (plan->m_enableFixTimeBuy)
-    {
-        // 定时购买流程
-        if (FixTimeBuyer::getInstance()->isRunning())
-        {
-            if (!UiUtil::showTipV2(QString::fromWCharArray(L"购买程序正在运行，您确定要结束购买吗？")))
-            {
-                return;
-            }
-
-            FixTimeBuyer::getInstance()->stop();
-            return;
-        }
-
-        if (!createPlanDataDirectory(plan->m_name))
-        {
-            return;
-        }
-
-        if (FixTimeBuyer::getInstance()->start(planId))
-        {
-            addLog(QString::fromWCharArray(L"购买程序已启动"));
-        }
-        else
-        {
-            QString error = FixTimeBuyer::getInstance()->getLastError();
-            addLog(QString::fromWCharArray(L"购买程序启动失败，错误是：%1").arg(error));
-        }
-
-        return;
     }
-
 
     PlanRunner* planRunner = m_planRunners[planId];
     if (planRunner)

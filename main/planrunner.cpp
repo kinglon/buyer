@@ -86,11 +86,36 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
         printLog(QString::fromWCharArray(L"skuid不存在"));
         return false;
     }
-
     QJsonObject phoneModelJson;
     phoneModelJson["model"] = phoneModel->m_model;
     phoneModelJson["phone_code"] = phoneModel->m_code;
     root["phone_model"] = phoneModelJson;
+
+    root["recommended_item"] = plan->m_recommendedSkuid;
+
+    // 随便选择一家店铺，真正下单的时候会改成有货的店铺
+    if (plan->m_buyingShops.size() == 0)
+    {
+        printLog(QString::fromWCharArray(L"购买店铺未配置"));
+        return false;
+    }
+
+    QString shopId;
+    QString shopPostalCode;
+    for (auto& shop : SettingManager::getInstance()->m_shops)
+    {
+        if (shop.m_name == plan->m_buyingShops[0])
+        {
+            shopId = shop.m_storeNumber;
+            shopPostalCode = shop.m_postalCode;
+            break;
+        }
+    }
+    if (shopId.isEmpty())
+    {
+        printLog(QString::fromWCharArray(L"购买店铺未找到"));
+        return false;
+    }
 
     // 计算分配的用户范围
     int begin = 0;
@@ -116,8 +141,24 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
     for (int i=0; i<plan->m_count; i++)
     {
         QJsonObject userJson;
-        userJson["account"] = UserInfoManager::getInstance()->m_users[begin+i].m_accountName;
-        userJson["password"] = UserInfoManager::getInstance()->m_users[begin+i].m_password;
+        UserItem& userItem = UserInfoManager::getInstance()->m_users[begin+i];
+        userJson["account"] = userItem.m_accountName;
+        userJson["password"] = userItem.m_password;
+        userJson["first_name"] = userItem.m_firstName;
+        userJson["last_name"] = userItem.m_lastName;
+        userJson["telephone"] = userItem.m_telephone;
+        userJson["email"] = userItem.m_email;
+        userJson["credit_card_no"] = userItem.m_creditCardNo;
+        userJson["expired_date"] = userItem.m_expiredDate;
+        userJson["cvv"] = userItem.m_cvv;
+        userJson["postal_code"] = userItem.m_postalCode;
+        userJson["state"] = userItem.m_state;
+        userJson["city"] = userItem.m_city;
+        userJson["street"] = userItem.m_street;
+        userJson["street2"] = userItem.m_street2;
+        userJson["giftcard_no"] = userItem.m_giftCardNo;
+        userJson["store"] = shopId;
+        userJson["store_postal_code"] = shopPostalCode;
         usersJson.append(userJson);
     }
     root["user"] = usersJson;
@@ -363,82 +404,27 @@ void PlanRunner::launchGoodsChecker()
         return;
     }
 
-    if (plan->m_enableFixTimeBuy)
+    m_goodsChecker = new GoodsAvailabilityChecker();
+    m_goodsChecker->setPhoneCode(plan->m_phoneCode);
+
+    QVector<ShopItem> queryShops;
+    for (const auto& shopName : plan->m_buyingShops)
     {
-        // 定时购买，开定时器等时间
-        int fixBuyTime = plan->m_fixBuyTime;
-        QVector<ShopItem>* shops = new QVector<ShopItem>();
-        for (const auto& shopId : plan->m_buyingShops)
+        for (const auto& shop : SettingManager::getInstance()->m_shops)
         {
-            for (const auto& shop : SettingManager::getInstance()->m_shops)
+            if (shop.m_name == shopName)
             {
-                if (shop.m_name == shopId)
-                {
-                    shops->append(shop);
-                    break;
-                }
-            }
-        }        
-
-        QTimer* timer = new QTimer(this);
-        timer->setInterval(20);
-        connect(timer, &QTimer::timeout, [this, timer, fixBuyTime, shops]() {
-            // 如果外部要求退出，就结束
-            if (m_requestStop)
-            {
-                delete shops;
-                timer->stop();
-                timer->deleteLater();
-                emit runFinish(m_planId, false);
-                return;
-            }
-
-            int now = QTime(0,0).secsTo(QDateTime::currentDateTime().time());
-            int tmpElapseSecs = fixBuyTime - now;
-            if (tmpElapseSecs>0 && m_elapseSeconds-tmpElapseSecs >= 10)
-            {
-                // 每10秒告知一次
-                emit printLog(QString::fromWCharArray(L"%1后开始购买").arg(tmpElapseSecs));
-                m_elapseSeconds = tmpElapseSecs;
-            }
-
-            if (now < fixBuyTime)
-            {
-                return;
-            }
-
-            timer->stop();
-            timer->deleteLater();
-
-            onGoodsCheckFinish(shops);
-        });
-        timer->start();
-    }
-    else
-    {
-        // 实时查询
-        m_goodsChecker = new GoodsAvailabilityChecker();
-        m_goodsChecker->setPhoneCode(plan->m_phoneCode);
-
-        QVector<ShopItem> queryShops;
-        for (const auto& shopId : plan->m_buyingShops)
-        {
-            for (const auto& shop : SettingManager::getInstance()->m_shops)
-            {
-                if (shop.m_name == shopId)
-                {
-                    queryShops.append(shop);
-                    break;
-                }
+                queryShops.append(shop);
+                break;
             }
         }
-        m_goodsChecker->setShops(queryShops);
-
-        connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
-        connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
-        connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
-        m_goodsChecker->start();
     }
+    m_goodsChecker->setShops(queryShops);
+
+    connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
+    connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
+    connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
+    m_goodsChecker->start();
 }
 
 void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
