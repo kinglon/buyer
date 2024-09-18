@@ -5,6 +5,7 @@ import traceback
 
 from requests_toolbelt.adapters import source
 
+from datamodel import DataModel
 from logutil import LogUtil
 from apple import AppleUtil
 import requests
@@ -40,10 +41,27 @@ def get_proxy_server_list(proxy_region):
 
 def add_cart(proxys, users, local_ips, phone_model, recommended_item):
     for i in range(len(users)):
-        account = users[i]['account']
-        password = users[i]['password']
+        # 构造data model对象
+        data_model = DataModel()
+        data_model.account = users[i]['account']
+        data_model.password = users[i]['password']
+        data_model.store = users[i]['store']
+        data_model.store_postal_code = users[i]['store_postal_code']
+        data_model.first_name = users[i]['first_name']
+        data_model.last_name = users[i]['last_name']
+        data_model.telephone = users[i]['telephone']
+        data_model.email = users[i]['email']
+        data_model.credit_card_no = users[i]['credit_card_no']
+        data_model.expired_date = users[i]['expired_date']
+        data_model.cvv = users[i]['cvv']
+        data_model.postal_code = users[i]['postal_code']
+        data_model.state = users[i]['state']
+        data_model.city = users[i]['city']
+        data_model.street = users[i]['street']
+        data_model.street2 = users[i]['street2']
+        data_model.giftcard_no = users[i]['giftcard_no']
 
-        print('开始上号，账号是：{}'.format(account))
+        print('开始上号，账号是：{}'.format(data_model.account))
         apple_util = AppleUtil()
 
         # 设置代理IP
@@ -60,7 +78,7 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
         apple_util.proxies = proxy
         print('使用代理IP：{}'.format(proxy))
 
-        fail_reason_prefix = '上号失败，账号是：{}，原因是：'.format(account)
+        fail_reason_prefix = '上号失败，账号是：{}，原因是：'.format(data_model.account)
 
         # 使用本地IP地址
         local_ip = local_ips[i % len(local_ips)]
@@ -146,12 +164,12 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
         success = False
         for j in range(max_retry_count):
             print('登录账号')
-            if not apple_util.login(account, password):
+            if not apple_util.login(data_model.account, data_model.password):
                 continue
             success = True
             break
         if not success:
-            error_message = '登录账号失败：{}, {}'.format(account, password)
+            error_message = '登录账号失败：{}, {}'.format(data_model.account, data_model.password)
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
@@ -213,9 +231,108 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
             error_message = '选择自提失败'
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
+        time.sleep(Setting.get().request_interval)
 
+        # 选择送货选项（手机无货需要送货）
+        success = False
+        shipping_option = ''
+        for j in range(max_retry_count):
+            print('选择送货选项')
+            shipping_option = apple_util.fulfillment_shipping_option(x_aos_stk, data_model)
+            if len(shipping_option) == 0:
+                continue
+            success = True
+            break
+        if not success:
+            error_message = '选择送货选项失败'
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+            continue
+        time.sleep(Setting.get().request_interval)
+
+        # 选择店铺
+        success = False
+        for j in range(max_retry_count):
+            print('选择店铺')
+            if not apple_util.fulfillment_store(x_aos_stk, data_model, shipping_option, None, None):
+                continue
+            success = True
+            break
+        if not success:
+            error_message = '选择店铺失败'
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+            continue
+        time.sleep(Setting.get().request_interval)
+
+        # 选择联系人
+        success = False
+        for j in range(max_retry_count):
+            print('选择联系人')
+            if not apple_util.pickup_contact(x_aos_stk, data_model):
+                continue
+            success = True
+            break
+        if not success:
+            error_message = '选择联系人失败'
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+            continue
+
+        # 填写配送信息
+        success = False
+        for j in range(max_retry_count):
+            print('填写配送信息')
+            if not apple_util.shipping_to_billing(x_aos_stk, data_model):
+                continue
+            success = True
+            break
+        if not success:
+            error_message = '填写配送信息失败'
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+            continue
+
+        if len(data_model.giftcard_no) == 0:
+            # 信用卡支付
+            success = False
+            for j in range(max_retry_count):
+                print('信用卡支付')
+                if not apple_util.billing(x_aos_stk, data_model):
+                    continue
+                success = True
+                break
+            if not success:
+                error_message = '信用卡支付失败'
+                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+                continue
+        else:
+            # 礼品卡支付
+            success = False
+            for j in range(max_retry_count):
+                print('使用礼品卡')
+                if not apple_util.use_giftcard(x_aos_stk, data_model):
+                    continue
+                success = True
+                break
+            if not success:
+                error_message = '使用礼品卡失败'
+                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+                continue
+
+            # 填写礼品卡账单信息
+            success = False
+            for j in range(max_retry_count):
+                print('填写礼品卡账单信息')
+                if not apple_util.billing_by_giftcard(x_aos_stk):
+                    continue
+                success = True
+                break
+            if not success:
+                error_message = '填写礼品卡账单信息失败'
+                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+                continue
+
+        # 上号成功，保存信息
+        print('上号成功')
         buy_param = {
-            'account': account,
+            'account': data_model.account,
             'appstore_host': apple_util.appstore_host,
             'x_aos_stk': x_aos_stk,
             'proxy_ip': '',
