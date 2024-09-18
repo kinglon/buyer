@@ -61,53 +61,99 @@ def test_v2():
     data_model.street2 = 'Zhaixianyuan'
     data_model.giftcard_no = 'XFWK2FVCHT89Z9PF'
 
-    # 添加商品
-    model = 'iphone-15'
-    product = 'MTML3J'
-    # model = 'iphone-16'
+    # 添加手机
+    # model = 'iphone-15'
+    # product = 'MTML3J'
+    model = 'iphone-16'
     # product = 'MYDU3J'  # iPhone 16 128GB
-    # product = 'MYWP3J'  # iPhone 16 Pro Max 512GB
+    product = 'MYWP3J'  # iPhone 16 Pro Max 512GB
     recommended_item = 'MWVV3AM'  # 20W 充电器
+    print('添加手机')
     if not apple_util.add_cart(model, product):
         return
 
     # 打开购物袋
+    print('打开购物袋')
     x_aos_stk = apple_util.open_cart()
     if x_aos_stk is None:
         return
 
     # 添加配件
+    print('添加配件')
     if not apple_util.add_recommended_item(recommended_item, x_aos_stk):
         return
 
     # 进入购物流程
+    print('进入购物流程')
     ssi = apple_util.checkout_now(x_aos_stk)
     if ssi is None:
         return
 
     # 登录
+    print('登录')
     if not apple_util.login(data_model.account, data_model.password):
         return
 
     # 绑定账号
+    print('绑定账号')
     pltn = apple_util.bind_account(x_aos_stk, ssi)
     if pltn is None:
         return
 
     # 开始下单
+    print('开始下单')
     if not apple_util.checkout_start(pltn):
         return
 
     # 进入下单页面
+    print('进入下单页面')
     x_aos_stk = apple_util.checkout()
     if x_aos_stk is None:
         return
 
     # 选择自提
+    print('选择自提')
     if not apple_util.fulfillment_retail(x_aos_stk):
         return
 
+    # 选择送货选项（手机无货需要送货）
+    print('选择送货选项')
+    shipping_option = apple_util.fulfillment_shipping_option(x_aos_stk, data_model)
+    if len(shipping_option) == 0:
+        return
+
+    # 选择店铺
+    print('选择店铺-指定送货选项')
+    if not apple_util.fulfillment_store(x_aos_stk, data_model, shipping_option, None, None):
+        return
+
+    # 选择联系人
+    print('填写联系人')
+    if not apple_util.pickup_contact(x_aos_stk, data_model):
+        return
+
+    # 填写配送信息
+    print('填写配送信息')
+    if not apple_util.shipping_to_billing(x_aos_stk, data_model):
+        return
+
+    if len(data_model.giftcard_no) == 0:
+        # 信用卡支付
+        print('信用卡支付')
+        if not apple_util.billing(x_aos_stk, data_model):
+            return
+    else:
+        # 礼品卡支付
+        print('使用礼品卡')
+        if not apple_util.use_giftcard(x_aos_stk, data_model):
+            return
+
+        print('填写礼品卡账单信息')
+        if not apple_util.billing_by_giftcard(x_aos_stk):
+            return
+
     # 查询是否有货
+    print('查询是否有货')
     if not apple_util.query_product_available(data_model.store_postal_code, product):
         return
 
@@ -116,25 +162,10 @@ def test_v2():
     if not success:
         return
 
-    # 选择店铺
-    if not apple_util.fulfillment_store(x_aos_stk, data_model, pickup_date, pickup_time):
+    # 选择店铺 - 指定领取时间
+    print('选择店铺-指定领取时间')
+    if not apple_util.fulfillment_store(x_aos_stk, data_model, '', pickup_date, pickup_time):
         return
-
-    # 选择联系人
-    if not apple_util.pickup_contact(x_aos_stk, data_model):
-        return
-
-    if len(data_model.giftcard_no) == 0:
-        # 信用卡支付
-        if not apple_util.billing(x_aos_stk, data_model):
-            return
-    else:
-        # 礼品卡支付
-        if not apple_util.use_giftcard(x_aos_stk, data_model):
-            return
-
-        if not apple_util.billing_by_giftcard(x_aos_stk, data_model):
-            return
 
     # 确认下单
     if not apple_util.review(x_aos_stk):

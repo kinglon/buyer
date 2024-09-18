@@ -251,8 +251,9 @@ class AppleUtil:
                 root = json.loads(data)
                 stores = root['body']['content']['pickupMessage']['stores']
                 for store in stores:
-                    if store['retailStore']['availableNow']:
+                    if store['partsAvailability'][product+'/A']['buyability']['isBuyable']:
                         return True
+                print('无货可购买')
                 return False
         except Exception as e:
             print("查询店铺是否有货失败，错误是：{}".format(e))
@@ -299,7 +300,7 @@ class AppleUtil:
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'cart'
             body = 'shoppingCart.recommendations.recommendedItem.part={}%2FA'.format(item_skuid)
-            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
                 print("添加配件失败，错误是：{}".format(self.last_response))
                 return False
@@ -445,6 +446,36 @@ class AppleUtil:
             print("选择自提失败，错误是：{}".format(e))
             return False
 
+    # 选择送货选项，返回送货选项的内容，如A7
+    def fulfillment_shipping_option(self, x_aos_stk, data_model):
+        try:
+            url = self.appstore_host + '/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Fulfillment-init'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+            body = ('checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore={}&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput={}'
+                    .format(data_model.store, data_model.store_postal_code))
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("选择送货选项失败，错误是：{}".format(self.last_response))
+                return ''
+
+            # 失败的话不是Json串，抛异常表示返回失败
+            data = self.last_response.content.decode('utf-8')
+            root = json.loads(data)
+            shipping_option = root['body']['checkout']['fulfillment']['pickupTab']['deliveryForced']['shipmentGroups']['shipmentGroup-1']['shipmentOptionsGroups']['shipmentOptionsGroup-1']['shippingOptions']['d']['options'][0]['value']
+            print('送货选项是: {}'.format(shipping_option))
+
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return shipping_option
+        except Exception as e:
+            print("选择送货选项失败，错误是：{}".format(e))
+            return ''
+
     # 查询可提货日期和时间，返回（success, date string, time json object）
     def fulfillment_pickup_datetime(self, x_aos_stk, data_model):
         error = (False, '', None)
@@ -498,7 +529,7 @@ class AppleUtil:
 
     # 自提选择店铺
     # date, 如 2024-09-20
-    def fulfillment_store(self, x_aos_stk, data_model, pickup_date, pickup_time):
+    def fulfillment_store(self, x_aos_stk, data_model, shipping_option, pickup_date, pickup_time):
         try:
             url = self.appstore_host + '/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment'
             headers = self.get_common_request_header()
@@ -510,10 +541,14 @@ class AppleUtil:
 
             body = {
                 'checkout.fulfillment.fulfillmentOptions.selectFulfillmentLocation': 'RETAIL',
+                'checkout.fulfillment.pickupTab.deliveryForced.shipmentGroups.shipmentGroup-1.shipmentOptionsGroups.shipmentOptionsGroup-1.shippingOptions.selectShippingOption': shipping_option,
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores': 'false',
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore': data_model.store,
                 'checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput': data_model.store_postal_code
             }
+
+            if len(shipping_option) > 0:
+                body['checkout.fulfillment.pickupTab.deliveryForced.shipmentGroups.shipmentGroup-1.shipmentOptionsGroups.shipmentOptionsGroup-1.shippingOptions.selectShippingOption'] = shipping_option
 
             if pickup_time:
                 body_time = {
@@ -556,7 +591,7 @@ class AppleUtil:
     # 选择联系人
     def pickup_contact(self, x_aos_stk, data_model):
         try:
-            url = self.appstore_host + '/shop/checkoutx?_a=continueFromPickupContactToBilling&_m=checkout.pickupContact'
+            url = self.appstore_host + '/shop/checkoutx?_a=continueFromPickupContactToShipping&_m=checkout.pickupContact'
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             headers['Referer'] = self.appstore_host + '/shop/checkout?_s=PickupContact-init'
@@ -591,72 +626,38 @@ class AppleUtil:
             print("选择联系人失败，错误是：{}".format(e))
             return False
 
-    # 选择使用信用卡支付方式
-    def billing_use_credit_card(self, x_aos_stk):
+    # 填写配送信息
+    def shipping_to_billing(self, x_aos_stk, data_model):
         try:
-            url = self.appstore_host + '/shop/checkoutx/billing?_a=selectBillingOptionAction&_m=checkout.billing.billingOptions'
+            url = self.appstore_host + '/shop/checkoutx/shipping?_a=continueFromShippingToBilling&_m=checkout.shipping'
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Shipping-init'
             headers['X-Aos-Stk'] = x_aos_stk
             headers['X-Requested-With'] = 'Fetch'
             headers['X-Aos-Model-Page'] = 'checkoutPage'
             body = {
-                'checkout.billing.billingOptions.selectBillingOption': 'CREDIT',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID': 'TF1;015;;;;;;;;;;;;;;;;;;;;;;Mozilla;Netscape;5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;20030107;undefined;true;;true;Win32;undefined;Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;zh-CN;undefined;secure7.store.apple.com;undefined;undefined;undefined;undefined;false;false;1719714662273;8;2005/6/7%2021%3A33%3A44;1366;768;;;;;;;;-480;-480;2024/6/30%2010%3A31%3A02;24;1366;728;0;0;;;;;;;;;;;;;;;;;;;25;',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': '',
-                'checkout.locationConsent.locationConsent': 'false'
-            }
-            body = '&'.join(
-                f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
-                for k, v in body.items())
-
-            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not self.last_response.ok:
-                print("选择使用信用卡支付失败，错误是：{}".format(self.last_response))
-                return False
-
-            # 失败的话不是Json串，抛异常表示返回失败
-            data = self.last_response.content.decode('utf-8')
-            root = json.loads(data)
-            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
-
-            self.cookies.update(self.last_response.cookies.get_dict())
-            return True
-        except Exception as e:
-            print("选择使用信用卡支付失败，错误是：{}".format(e))
-            return False
-
-    # 检查信用卡类型
-    def billing_check_credit_card_type(self, x_aos_stk, data_model):
-        try:
-            url = self.appstore_host + '/shop/checkoutx/billing?_a=checkCreditCardTypeAction&_m=checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0'
-            headers = self.get_common_request_header()
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
-            headers['X-Aos-Stk'] = x_aos_stk
-            headers['X-Requested-With'] = 'Fetch'
-            headers['X-Aos-Model-Page'] = 'checkoutPage'
-
-            card_number_for_detection = data_model.credit_card_no[0:4] + ' ' + data_model.credit_card_no[4:6]
-            public_key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB'
-            cipher_text = AppleUtil.encrypt(public_key, data_model.credit_card_no.encode('utf-8'))
-            card_number = '{"cipherText":"%s==","publicKeyHash":"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=="}' % cipher_text
-            body = {
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber': 'true',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection': card_number_for_detection,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType': 'MASTERCARD',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode': '',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration': '',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber': card_number
+                'checkout.shipping.addressNotification.address.emailAddress': '',
+                'checkout.shipping.addressSelector.selectAddress': 'newAddr',
+                'checkout.shipping.addressSelector.newAddress.saveToAddressBook': 'true',
+                'checkout.shipping.addressSelector.newAddress.address.city': data_model.city,
+                'checkout.shipping.addressSelector.newAddress.address.state': data_model.state,
+                'checkout.shipping.addressSelector.newAddress.address.lastName': data_model.first_name,
+                'checkout.shipping.addressSelector.newAddress.address.firstName': data_model.last_name,
+                'checkout.shipping.addressSelector.newAddress.address.companyName': '',
+                'checkout.shipping.addressSelector.newAddress.address.postalCode': data_model.postal_code,
+                'checkout.shipping.addressSelector.newAddress.address.street2': '',
+                'checkout.shipping.addressSelector.newAddress.address.street': data_model.street,
+                'checkout.shipping.addressSelector.newAddress.address.isBusinessAddress': 'false',
             }
             body = '&'.join(
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
                 for k, v in body.items())
 
-            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies,
+                                                   timeout=self.timeout)
             if not self.last_response.ok:
-                print("检测信用卡类型失败，错误是：{}".format(self.last_response))
+                print("填写配送信息失败，错误是：{}".format(self.last_response))
                 return False
 
             # 失败的话不是Json串，抛异常表示返回失败
@@ -667,100 +668,10 @@ class AppleUtil:
             self.cookies.update(self.last_response.cookies.get_dict())
             return True
         except Exception as e:
-            print("检测信用卡类型失败，错误是：{}".format(e))
+            print("填写配送信息失败，错误是：{}".format(e))
             return False
 
-    # 输入信用卡信息
-    def billing_input_credit_card(self, x_aos_stk, data_model):
-        try:
-            url = self.appstore_host + '/shop/checkoutx/billing?_a=creditCardAction&_m=checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0'
-            headers = self.get_common_request_header()
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
-            headers['X-Aos-Stk'] = x_aos_stk
-            headers['X-Requested-With'] = 'Fetch'
-            headers['X-Aos-Model-Page'] = 'checkoutPage'
-
-            card_number_for_detection = data_model.credit_card_no[0:4] + ' ' + data_model.credit_card_no[4:6]
-            public_key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB'
-            cipher_text = AppleUtil.encrypt(public_key, data_model.credit_card_no.encode('utf-8'))
-            card_number = '{"cipherText":"%s","publicKeyHash":"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs="}' % cipher_text
-            body = {
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber': 'true',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection': card_number_for_detection,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType': 'MASTERCARD',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode': data_model.cvv,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration': data_model.expired_date,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumber': card_number
-            }
-            body = '&'.join(
-                f'{urllib.parse.quote(k, encoding="utf-8", safe="")}={urllib.parse.quote(v, encoding="utf-8", safe="")}'
-                for k, v in body.items())
-
-            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not self.last_response.ok:
-                print("输入信用卡信息失败，错误是：{}".format(self.last_response))
-                return False
-
-            # 失败的话不是Json串，抛异常表示返回失败
-            data = self.last_response.content.decode('utf-8')
-            root = json.loads(data)
-            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
-
-            self.cookies.update(self.last_response.cookies.get_dict())
-            return True
-        except Exception as e:
-            print("输入信用卡信息失败，错误是：{}".format(e))
-            return False
-
-    # 输入账单地址后付款
-    def billing_input_address(self, x_aos_stk, data_model):
-        try:
-            url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing'
-            headers = self.get_common_request_header()
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Billing-init'
-            headers['X-Aos-Stk'] = x_aos_stk
-            headers['X-Requested-With'] = 'Fetch'
-            headers['X-Aos-Model-Page'] = 'checkoutPage'
-
-            body = {
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.city': data_model.city,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.state': data_model.state,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.lastName': data_model.last_name,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.firstName': data_model.first_name,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.countryCode': 'JP',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street': data_model.street,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.postalCode': data_model.postal_code,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.billingAddress.address.street2': data_model.street2,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.validCardNumber': 'false',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.cardNumberForBinDetection': '',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.selectCardType': 'MASTERCARD',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.securityCode': '•••',
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.cardInputs.cardInput-0.expiration': data_model.expired_date,
-                'checkout.billing.billingOptions.selectedBillingOptions.creditCard.creditInstallment.selectedInstallment': '1',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.deviceID': 'TF1;015;;;;;;;;;;;;;;;;;;;;;;Mozilla;Netscape;5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;20030107;undefined;true;;true;Win32;undefined;Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/122.0.0.0%20Safari/537.36;zh-CN;undefined;secure6.store.apple.com;undefined;undefined;undefined;undefined;false;false;1719667606222;8;2005/6/7%2021%3A33%3A44;1366;768;;;;;;;;-480;-480;2024/6/29%2021%3A26%3A46;24;1366;728;0;0;;;;;;;;;;;;;;;;;;;25;',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.giftCardInput.giftCard': ''
-            }
-            body = '&'.join(f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}' for k, v in body.items())
-
-            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not self.last_response.ok:
-                print("输入账单地址失败，错误是：{}".format(self.last_response))
-                return False
-
-            # 失败的话不是Json串，抛异常表示返回失败
-            data = self.last_response.content.decode('utf-8')
-            root = json.loads(data)
-            print('页面标题：{}'.format(AppleUtil.parse_page_title(root)))
-
-            self.cookies.update(self.last_response.cookies.get_dict())
-            return True
-        except Exception as e:
-            print("输入账单地址失败，错误是：{}".format(e))
-            return False
-
-    # 信用卡支付（一步到位）
+    # 信用卡支付
     def billing(self, x_aos_stk, data_model):
         try:
             url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing'
@@ -860,7 +771,7 @@ class AppleUtil:
             return False
 
     # 礼品卡支付，填写账单信息
-    def billing_by_giftcard(self, x_aos_stk, data_model):
+    def billing_by_giftcard(self, x_aos_stk):
         try:
             url = self.appstore_host + '/shop/checkoutx/billing?_a=continueFromBillingToReview&_m=checkout.billing'
             headers = self.get_common_request_header()
@@ -871,15 +782,7 @@ class AppleUtil:
             headers['X-Aos-Model-Page'] = 'checkoutPage'
 
             body = {
-                'checkout.billing.billingOptions.selectBillingOption': '',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.city': data_model.city,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.state': data_model.state,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.lastName': data_model.last_name,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.firstName': data_model.first_name,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.countryCode': 'JP',
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.street': data_model.street,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.postalCode': data_model.postal_code,
-                'checkout.billing.billingOptions.selectedBillingOptions.giftCard.billingAddress.address.street2': data_model.street2,
+                'checkout.billing.billingOptions.selectBillingOption': ''
             }
             body = '&'.join(
                 f'{urllib.parse.quote(k, encoding="utf-8", safe="%")}={urllib.parse.quote(v, encoding="utf-8", safe="%")}'
