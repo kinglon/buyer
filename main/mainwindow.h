@@ -54,6 +54,8 @@ private:
 private slots:
     void onImportUserInfoBtn();
 
+    void onImportRecommendBtn();
+
     void onAddPlanBtn();
 
     void onEditPlanBtn(QString planId);

@@ -15,8 +15,12 @@ public:
 public:
     PhoneModel* getPhoneModelByCode(QString code);
 
+    bool importRecommends(QString recommendFilePath);
+
 private:
     void load();
+
+    void loadRecommend();
 
 public:
     int m_logLevel = 2;  // info level

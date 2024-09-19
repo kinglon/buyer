@@ -38,7 +38,14 @@
        <item>
         <widget class="QPushButton" name="selectUserInfoBtn">
          <property name="text">
-          <string>选择用户资料</string>
+          <string>导入用户资料</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="importRecommendBtn">
+         <property name="text">
+          <string>导入配件列表</string>
          </property>
         </widget>
        </item>

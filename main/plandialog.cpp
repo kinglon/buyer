@@ -36,6 +36,7 @@ void PlanDialog::initCtrls()
     }
 
     ui->recommendComboBox->clear();
+    ui->recommendComboBox->addItem(QString::fromWCharArray(L"无"), QVariant(""));
     for (const auto& recommendItem : SettingManager::getInstance()->m_recommendedItems)
     {
         ui->recommendComboBox->addItem(recommendItem.m_name, QVariant(recommendItem.m_skuid));
@@ -80,10 +81,10 @@ void PlanDialog::updateCtrls()
        }
    }
 
-   ui->recommendComboBox->setCurrentIndex(-1);
+   ui->recommendComboBox->setCurrentIndex(0);
    if (!m_planItem.m_recommendedSkuid.isEmpty())
    {
-       for (int i = 0; i < ui->recommendComboBox->count(); i++)
+       for (int i = 1; i < ui->recommendComboBox->count(); i++)
        {
            QVariant itemData = ui->recommendComboBox->itemData(i);
            if (itemData.toString() == m_planItem.m_recommendedSkuid)
@@ -176,11 +177,6 @@ void PlanDialog::onOkBtn()
     {
         QVariant itemData = ui->recommendComboBox->itemData(reSkuidSelIndex);
         m_planItem.m_recommendedSkuid = itemData.toString();
-    }
-    if (m_planItem.m_recommendedSkuid.isEmpty())
-    {
-        UiUtil::showTip(QString::fromWCharArray(L"配件未选择"));
-        return;
     }
 
     m_planItem.m_payment = PAYMENT_NONE;
