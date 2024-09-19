@@ -156,7 +156,14 @@ bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFileP
         userJson["city"] = userItem.m_city;
         userJson["street"] = userItem.m_street;
         userJson["street2"] = userItem.m_street2;
-        userJson["giftcard_no"] = userItem.m_giftCardNo;
+        if (plan->m_payment == PAYMENT_GIFT_CARD)
+        {
+            userJson["giftcard_no"] = userItem.m_giftCardNo;
+        }
+        else
+        {
+            userJson["giftcard_no"] = "";
+        }
         userJson["store"] = shopId;
         userJson["store_postal_code"] = shopPostalCode;
         usersJson.append(userJson);

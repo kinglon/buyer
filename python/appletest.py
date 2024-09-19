@@ -64,8 +64,9 @@ def test_v2():
     # 添加手机
     # model = 'iphone-15'
     # product = 'MTML3J'
-    model = 'iphone-16'
+    # model = 'iphone-16'
     # product = 'MYDU3J'  # iPhone 16 128GB
+    model = 'iphone-16-pro'
     product = 'MYWP3J'  # iPhone 16 Pro Max 512GB
     recommended_item = 'MWVV3AM'  # 20W 充电器
     print('添加手机')

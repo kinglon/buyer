@@ -82,7 +82,7 @@ void SettingManager::load()
         }
     }
 
-    QJsonObject recommendedItems = root["recommended_item"].toObject();
+    QJsonArray recommendedItems = root["recommended_item"].toArray();
     for (auto item : recommendedItems)
     {
         QJsonObject itemJson = item.toObject();
