@@ -23,6 +23,7 @@ class AppleUtil:
         self.debug_cookie = ''
         self.timeout = 20
         self.session = requests.Session()
+        self.atbtoken = ''
 
         # 最后一个响应
         self.last_response = None
@@ -213,13 +214,14 @@ class AppleUtil:
             # 加入购物车
             atbtoken = self.cookies['as_atb']
             atbtoken = atbtoken[atbtoken.rfind('|')+1:]
+            self.atbtoken = atbtoken
             buy_what = 'buy-watch' if model.find('watch') >= 0 else 'buy-iphone'
             url = (self.apple_host + '/shop/{}/{}?product={}%2FA&purchaseOption=fullPrice&cppart=UNLOCKED_JP&step=select&ao.applecare_58=none&ao.applecare_58_theft_loss=none&ams=0&atbtoken={}&igt=true&add-to-cart=add-to-cart'
                    .format(buy_what, model, product, atbtoken))
             headers = self.get_common_request_header()
             self.last_response = self.session.get(url, headers=headers, allow_redirects=False, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
-                print("添加商品到购物包失败，错误是：{}".format(self.last_response))
+                print("添加手机到购物包失败，错误是：{}".format(self.last_response))
                 return False
             else:
                 if ('Location' in self.last_response.headers and
@@ -228,16 +230,49 @@ class AppleUtil:
                     self.cookies.update(self.last_response.cookies.get_dict())
                     return True
                 else:
-                    print("添加商品到购物包失败，错误是：没有Location头部信息")
+                    print("添加手机到购物包失败，错误是：没有Location头部信息")
                     return False
         except Exception as e:
             print("添加商品到购物包失败，错误是：{}".format(e))
+            return False
+
+    # 添加配件
+    # 返回 is success
+    def add_recommended_item(self, item_skuid, data_model):
+        try:
+            url = (self.apple_host + '/shop/fulfillment-messages?store={}&little=false&sp=true&parts.0={}/A&mts.0=regular&fts=true'.
+                   format(data_model.store, item_skuid))
+            headers = self.get_common_request_header()
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("添加配件到购物包失败，错误是：{}".format(self.last_response))
+                return False
+            cookies = self.last_response.cookies.get_dict()
+            self.cookies.update(cookies)
+
+            url = self.apple_host + '/shop/pdpAddToBag/{}/A'.format(item_skuid)
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            body = 'product={}%2FA&atbtoken={}'.format(item_skuid, self.atbtoken)
+            self.last_response = self.session.post(url, headers=headers, data=body, allow_redirects=False, proxies=self.proxies,
+                                                  timeout=self.timeout)
+            if not self.last_response.ok:
+                print("添加配件到购物包失败，错误是：{}".format(self.last_response))
+                return False
+            if self.last_response.status_code != 303:
+                print("添加配件到购物包失败，错误是：状态码不是303跳转到购物袋")
+                return False
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True
+        except Exception as e:
+            print("添加配件到购物包失败，错误是：{}".format(e))
             return False
 
     # 查询是否有货
     # location 邮编，如：104-8125
     # product 产品，如：MTU93J/A(iphone 15 pro max, 1T, 天然钛)  MU713J/A(iphone 15 pro, 128G, 天然钛)
     def query_product_available(self, location, product):
+        error_result = (False, '', '')
         try:
             url = (self.apple_host + '/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0={}/A&location={}'
                    .format(product, location))
@@ -245,23 +280,23 @@ class AppleUtil:
             self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
                 print("查询店铺是否有货失败，错误是：".format(self.last_response))
-                return False
+                return error_result
             else:
                 data = self.last_response.content.decode('utf-8')
                 root = json.loads(data)
                 stores = root['body']['content']['pickupMessage']['stores']
                 for store in stores:
                     if store['partsAvailability'][product+'/A']['buyability']['isBuyable']:
-                        return True
+                        return True, store['storeNumber'], store['address']['postalCode']
                 print('无货可购买')
-                return False
+                return error_result
         except Exception as e:
             print("查询店铺是否有货失败，错误是：{}".format(e))
-            return False
+            return error_result
 
     # 打开购物车
     # 返回x-aos-stk的值
-    def open_cart(self):
+    def open_cart(self, goods_count):
         try:
             url = self.apple_host + '/shop/bag'
             headers = self.get_common_request_header()
@@ -276,46 +311,34 @@ class AppleUtil:
                     print("打开购物包失败，错误是：未找到checkout url")
                     return None
 
+                # 获取x_aos_stk
+                x_aos_stk = ''
                 begin = data.find('x-aos-stk":')
                 if begin > 0:
                     begin = data.find('"', begin + len('x-aos-stk":'))
                     if begin > 0:
                         end = data.find('"', begin + 1)
                         x_aos_stk = data[begin+1: end]
-                        return x_aos_stk
-                print("打开购物包失败，错误是：未找到x_aos_stk")
-                return None
+                if len(x_aos_stk) == 0:
+                    print("打开购物包失败，错误是：未找到x_aos_stk")
+                    return None
+
+                # 获取货品名称
+                goods = []
+                begin = data.find('"productsString":"')
+                if begin > 0:
+                    end = data.find('"', begin + len('"productsString": "'))
+                    product_string = data[begin + len('"productsString": "'): end]
+                    print('购物袋内商品：{}'.format(product_string))
+                    goods = product_string.split(',')
+                if len(goods) != goods_count:
+                    print("打开购物包失败，错误是：商品数量不对")
+                    return None
+
+                return x_aos_stk
         except Exception as e:
             print("打开购物包失败，错误是：{}".format(e))
             return None
-
-    # 添加配件
-    # 返回 is success
-    def add_recommended_item(self, item_skuid, x_aos_stk):
-        try:
-            url = self.apple_host + '/shop/bagx?_a=addToCart&_m=shoppingCart.recommendations.recommendedItem'
-            headers = self.get_common_request_header()
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            headers['X-Aos-Stk'] = x_aos_stk
-            headers['X-Requested-With'] = 'Fetch'
-            headers['X-Aos-Model-Page'] = 'cart'
-            body = 'shoppingCart.recommendations.recommendedItem.part={}%2FA'.format(item_skuid)
-            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies, timeout=self.timeout)
-            if not self.last_response.ok:
-                print("添加配件失败，错误是：{}".format(self.last_response))
-                return False
-            else:
-                self.cookies.update(self.last_response.cookies.get_dict())
-                data = self.last_response.content.decode('utf-8')
-                root = json.loads(data)
-                status = root['head']['status']
-                if status == 200:
-                    return True
-                print("添加配件失败，错误是：{}".format(status))
-                return False
-        except Exception as e:
-            print("添加配件失败，错误是：{}".format(e))
-            return False
 
     # 进入下单流程
     # 返回ssi

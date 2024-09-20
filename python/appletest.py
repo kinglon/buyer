@@ -45,8 +45,8 @@ def test_v2():
     data_model = DataModel()
     data_model.account = 'm16670802@163.com'
     data_model.password = 'Cxh520941'
-    data_model.store = 'R079'
-    data_model.store_postal_code = '104-0061'
+    data_model.store = 'R128'
+    data_model.store_postal_code = '160-0022'
     data_model.first_name = 'Jeric'
     data_model.last_name = 'Ye'
     data_model.telephone = '08054897787'
@@ -67,21 +67,21 @@ def test_v2():
     # model = 'iphone-16'
     # product = 'MYDU3J'  # iPhone 16 128GB
     model = 'iphone-16-pro'
-    product = 'MYWP3J'  # iPhone 16 Pro Max 512GB
-    recommended_item = 'MWVV3AM'  # 20W 充电器
+    product = 'MYWM3J'  # iPhone 16 Pro Max 512GB
+    recommended_item = 'MD504ZM'
     print('添加手机')
     if not apple_util.add_cart(model, product):
         return
 
-    # 打开购物袋
-    print('打开购物袋')
-    x_aos_stk = apple_util.open_cart()
-    if x_aos_stk is None:
-        return
-
     # 添加配件
     print('添加配件')
-    if not apple_util.add_recommended_item(recommended_item, x_aos_stk):
+    if not apple_util.add_recommended_item(recommended_item, data_model):
+        return
+
+    # 打开购物袋
+    print('打开购物袋')
+    x_aos_stk = apple_util.open_cart(2)
+    if x_aos_stk is None:
         return
 
     # 进入购物流程
@@ -154,23 +154,39 @@ def test_v2():
             return
 
     # 查询是否有货
-    print('查询是否有货')
-    if not apple_util.query_product_available(data_model.store_postal_code, product):
-        return
+    while True:
+        print('查询是否有货')
+        success, store_id, store_postal_code = apple_util.query_product_available(data_model.store_postal_code, product)
+        if not success:
+            time.sleep(1)
+            continue
+        data_model.store = store_id
+        data_model.store_postal_code = store_postal_code
+        break
 
     # 查询可购买日期和时间
-    success, pickup_date, pickup_time = apple_util.fulfillment_pickup_datetime(x_aos_stk, data_model)
-    if not success:
-        return
+    while True:
+        print('查询可购买日期和时间')
+        success, pickup_date, pickup_time = apple_util.fulfillment_pickup_datetime(x_aos_stk, data_model)
+        if not success:
+            time.sleep(1)
+            continue
+        break
 
     # 选择店铺 - 指定领取时间
-    print('选择店铺-指定领取时间')
-    if not apple_util.fulfillment_store(x_aos_stk, data_model, '', pickup_date, pickup_time):
-        return
+    while True:
+        print('选择店铺-指定领取时间')
+        if not apple_util.fulfillment_store(x_aos_stk, data_model, '', pickup_date, pickup_time):
+            time.sleep(1)
+            continue
+        break
 
     # 确认下单
-    if not apple_util.review(x_aos_stk):
-        return
+    while True:
+        if not apple_util.review(x_aos_stk):
+            time.sleep(1)
+            continue
+        break
 
     # 查询处理结果
     while True:
