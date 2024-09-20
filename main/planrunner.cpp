@@ -82,7 +82,7 @@ void PlanRunner::printLog(const QString& content)
 bool PlanRunner::createAddCardRunnerParamFile(PlanItem* plan, QString paramFilePath)
 {
     QJsonObject root;
-    root["use_proxy"] = SettingManager::getInstance()->m_useProxy;
+    root["use_proxy"] = SettingManager::getInstance()->m_addCartUseProxy;
     root["proxy_region"] = SettingManager::getInstance()->m_proxyRegion;
     root["thread_num"] = plan->m_addCartThreadCount;
 

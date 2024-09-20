@@ -25,7 +25,11 @@ private:
 public:
     int m_logLevel = 2;  // info level
 
-    bool m_useProxy = true;
+    // 除上号外是否使用代理
+    bool m_useProxy = false;
+
+    // 上号是否使用代理
+    bool m_addCartUseProxy = true;
 
     bool m_enableDebug = false;
 

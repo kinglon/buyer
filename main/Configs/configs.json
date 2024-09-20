@@ -1,7 +1,8 @@
 {   
     "log_level":2,
     "enable_debug": false,
-    "use_proxy": true,
+    "use_proxy": false,
+    "addcart_use_proxy": true,
     "proxy_region": "jp",
     "query_good_interval": 100,
     "stop_step": 100,

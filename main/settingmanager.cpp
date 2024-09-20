@@ -49,6 +49,7 @@ void SettingManager::load()
 
     m_logLevel = root["log_level"].toInt();
     m_useProxy = root["use_proxy"].toBool();
+    m_addCartUseProxy = root["addcart_use_proxy"].toBool();
     m_enableDebug = root["enable_debug"].toBool();
     m_proxyRegion = root["proxy_region"].toString();
     m_queryGoodInterval = root["query_good_interval"].toInt();

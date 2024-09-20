@@ -226,11 +226,14 @@ void MainWindow::onDeletePlanBtn(QString planId)
 
 void MainWindow::onRunPlanBtn(QString planId)
 {
-    ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
-    if (proxyServer.m_ip.isEmpty())
+    if (SettingManager::getInstance()->m_useProxy)
     {
-        UiUtil::showTip(QString::fromWCharArray(L"正在获取代理IP，请稍后"));
-        return;
+        ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
+        if (proxyServer.m_ip.isEmpty())
+        {
+            UiUtil::showTip(QString::fromWCharArray(L"正在获取代理IP，请稍后"));
+            return;
+        }
     }
 
     PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
