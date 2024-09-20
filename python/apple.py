@@ -240,8 +240,37 @@ class AppleUtil:
     # 返回 is success
     def add_recommended_item(self, item_skuid, data_model):
         try:
+            # 查询有货的店铺
+            url = (
+                        self.apple_host + '/shop/fulfillment-messages?searchNearby=true&parts.0={}/A&location={}'.
+                        format(item_skuid, data_model.store_postal_code))
+            headers = self.get_common_request_header()
+            self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
+            if not self.last_response.ok:
+                print("查询有货的店铺失败，错误是：{}".format(self.last_response))
+                return False
+            data = self.last_response.content.decode('utf-8')
+            root = json.loads(data)
+            stores = root['body']['content']['pickupMessage']['stores']
+            store_id = ''
+            store_postal_code = ''
+            for store in stores:
+                if store['partsAvailability'][item_skuid + '/A']['buyability']['isBuyable']:
+                    store_id = store['storeNumber']
+                    store_postal_code = store['address']['postalCode']
+                    if store_id == data_model.store:
+                        break
+            if len(store_id) == 0:
+                print('无店铺可购买')
+                return False
+            if store_id != data_model.store:
+                print('计划在店铺{}购买，但无货改为在店铺{}购买'.format(data_model.store, store_id))
+                data_model.store = store_id
+                data_model.store_postal_code = store_postal_code
+
+            # 选择店铺
             url = (self.apple_host + '/shop/fulfillment-messages?store={}&little=false&sp=true&parts.0={}/A&mts.0=regular&fts=true'.
-                   format(data_model.store, item_skuid))
+                   format(store_id, item_skuid))
             headers = self.get_common_request_header()
             self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
             if not self.last_response.ok:
@@ -250,6 +279,7 @@ class AppleUtil:
             cookies = self.last_response.cookies.get_dict()
             self.cookies.update(cookies)
 
+            # 添加配件
             url = self.apple_host + '/shop/pdpAddToBag/{}/A'.format(item_skuid)
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
