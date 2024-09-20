@@ -27,6 +27,7 @@ SOURCES += \
     planitemwidget.cpp \
     planmanager.cpp \
     planrunner.cpp \
+    proxymanager.cpp \
     settingmanager.cpp \
     uiutil.cpp \
     userinfomanager.cpp
@@ -50,6 +51,7 @@ HEADERS += \
     planitemwidget.h \
     planmanager.h \
     planrunner.h \
+    proxymanager.h \
     settingmanager.h \
     uiutil.h \
     userinfomanager.h

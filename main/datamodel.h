@@ -68,8 +68,7 @@ public:
     bool isValid()
     {
         if (m_accountName.isEmpty() || m_password.isEmpty() || m_firstName.isEmpty() || m_lastName.isEmpty()
-                || m_telephone.isEmpty() || m_email.isEmpty() || m_creditCardNo.isEmpty()
-                || m_expiredDate.isEmpty() || m_cvv.isEmpty() || m_postalCode.isEmpty()
+                || m_telephone.isEmpty() || m_email.isEmpty() || m_postalCode.isEmpty()
                 || m_state.isEmpty() || m_city.isEmpty() || m_street.isEmpty())
         {
             return false;

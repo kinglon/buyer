@@ -10,6 +10,7 @@
 #include <QUrlQuery>
 #include <QRandomGenerator>
 #include "settingmanager.h"
+#include "proxymanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
 
@@ -144,9 +145,12 @@ QString GoodsBuyer::getBodyString(const QMap<QString, QString>& body)
 
 CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
 {
-    ProxyServer proxyServer;
-    proxyServer.m_ip = userData->m_buyParam.m_proxyIp;
-    proxyServer.m_port = userData->m_buyParam.m_proxyPort;
+    ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
+    if (proxyServer.m_ip.isEmpty())
+    {
+        qCritical("failed to get a proxy");
+        return nullptr;
+    }
 
     QMap<QString, QString> headers;
     headers["origin"] = APPLE_HOST;

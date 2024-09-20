@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QNetworkInterface>
 #include "settingmanager.h"
+#include "proxymanager.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
 
@@ -36,79 +37,6 @@ QVector<QString> GoodsAvailabilityChecker::getLocalIps()
     }
 
     return ipAddresses;
-}
-
-void GoodsAvailabilityChecker::getProxyServer(QVector<ProxyServer>& proxyServers)
-{
-    int retryCount = 3;
-    for (int i=0; i<retryCount && !m_requestStop; i++)
-    {
-        QString url = QString("http://api.proxy.ipidea.io/getProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions=%1&protocol=socks5");
-        CURL* curl = makeRequest(url, QMap<QString,QString>(), QMap<QString,QString>(), ProxyServer());
-        if (curl == nullptr)
-        {
-            return;
-        }
-
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
-
-        CURLcode result = curl_easy_perform(curl);
-        if(result != CURLE_OK)
-        {
-            qCritical("failed to perform the request of getting proxy server, error is %s", curl_easy_strerror(result));
-            freeRequest(curl);
-            QThread::msleep(1000);
-            continue;
-        }
-
-        long statusCode = 0;
-        QString data;
-        getResponse(curl, statusCode, data);
-        freeRequest(curl);
-
-        if (statusCode != 200)
-        {
-            qCritical("failed to perform the request of getting proxy server, status code is %d, data is %s", statusCode, data.toStdString().c_str());
-            QThread::msleep(1000);
-            continue;
-        }
-
-        parseProxyServerData(data, proxyServers);
-        return;
-    }
-}
-
-void GoodsAvailabilityChecker::parseProxyServerData(const QString& data, QVector<ProxyServer>& proxyServers)
-{
-    QByteArray jsonData = data.toUtf8();
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
-    if (jsonDocument.isNull() || jsonDocument.isEmpty())
-    {
-        qCritical("failed to parse json, data is %s", data.toStdString().c_str());
-        return;
-    }
-
-    QJsonObject root = jsonDocument.object();
-    if (!root.contains("success") || !root["success"].toBool() || !root.contains("data"))
-    {
-        qCritical("the proxy server report error, data is %s", data.toStdString().c_str());
-        if (root.contains("msg"))
-        {
-            QString msg = root["msg"].toString();
-            emit printLog(msg.toStdString().c_str());
-        }
-        return;
-    }
-
-    QJsonArray proxyArray = root["data"].toArray();
-    for (auto proxy : proxyArray)
-    {
-        QJsonObject proxyJson = proxy.toObject();
-        ProxyServer proxyItem;
-        proxyItem.m_ip = proxyJson["ip"].toString();
-        proxyItem.m_port = proxyJson["port"].toInt();
-        proxyServers.append(proxyItem);
-    }
 }
 
 QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
@@ -251,8 +179,12 @@ CURL* GoodsAvailabilityChecker::makeQueryRequest(QString postal)
     ProxyServer proxyServer;
     if (SettingManager::getInstance()->m_useProxy)
     {
-        proxyServer = m_proxyServers[m_nextProxyIndex];
-        m_nextProxyIndex = (m_nextProxyIndex + 1) % m_proxyServers.size();
+        proxyServer = ProxyManager::getInstance()->getProxyServer();
+        if (proxyServer.m_ip.isEmpty())
+        {
+            qCritical("failed to get a proxy");
+            return nullptr;
+        }
     }
 
     CURL* request = makeRequest(url, QMap<QString,QString>(), QMap<QString, QString>(), proxyServer);
@@ -345,21 +277,7 @@ void GoodsAvailabilityChecker::run()
     {
         emit checkFinish(nullptr);
         return;
-    }
-
-    // 获取代理IP池
-    if (SettingManager::getInstance()->m_useProxy)
-    {
-        QVector<ProxyServer> proxyServers;
-        getProxyServer(proxyServers);
-        if (proxyServers.empty())
-        {
-            emit printLog(QString::fromWCharArray(L"获取代理IP池失败"));
-            emit checkFinish(nullptr);
-            return;
-        }
-        m_proxyServers = proxyServers;
-    }
+    }    
 
     // 查询是否有货
     QVector<ShopItem> shops = queryIfGoodsAvailable();

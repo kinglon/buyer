@@ -11,6 +11,7 @@
 #include "fixtimebuyer.h"
 #include "Utility/ImPath.h"
 #include "settingmanager.h"
+#include "proxymanager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,6 +23,8 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowFlag(Qt::MSWindowsFixedSizeDialogHint, true);
 
     initCtrls();
+
+    ProxyManager::getInstance()->start();
 }
 
 MainWindow::~MainWindow()
@@ -223,6 +226,13 @@ void MainWindow::onDeletePlanBtn(QString planId)
 
 void MainWindow::onRunPlanBtn(QString planId)
 {
+    ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
+    if (proxyServer.m_ip.isEmpty())
+    {
+        UiUtil::showTip(QString::fromWCharArray(L"正在获取代理IP，请稍后"));
+        return;
+    }
+
     PlanItem* plan = PlanManager::getInstance()->getPlanById(planId);
     if (plan == nullptr)
     {
