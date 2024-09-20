@@ -97,28 +97,45 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
 
         max_retry_count = 3
 
-        # 添加商品
+        # 添加手机
         model = phone_model['model']
         code = phone_model['phone_code']
+        goods_count = 1
         success = False
         for j in range(max_retry_count):
-            print('加入购物包: {}, {}'.format(model, code))
+            print('添加手机: {}, {}'.format(model, code))
             if not apple_util.add_cart(model, code):
                 continue
             success = True
             break
         if not success:
-            error_message = '加入购物包失败: {}, {}'.format(model, code)
+            error_message = '添加手机失败: {}, {}'.format(model, code)
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
+
+        # 添加配件
+        if len(recommended_item) > 0:
+            goods_count += 1
+            success = False
+            for j in range(max_retry_count):
+                print('添加配件')
+                if not apple_util.add_recommended_item(recommended_item, data_model):
+                    continue
+                success = True
+                break
+            if not success:
+                error_message = '添加配件失败'
+                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+                continue
+            time.sleep(Setting.get().request_interval)
 
         # 打开购物袋
         success = False
         x_aos_stk = ''
         for j in range(max_retry_count):
             print('打开购物包')
-            x_aos_stk = apple_util.open_cart()
+            x_aos_stk = apple_util.open_cart(goods_count)
             if x_aos_stk is None:
                 continue
             success = True
@@ -128,21 +145,6 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
             StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
             continue
         time.sleep(Setting.get().request_interval)
-
-        # 添加配件
-        if len(recommended_item) > 0:
-            success = False
-            for j in range(max_retry_count):
-                print('添加配件')
-                if not apple_util.add_recommended_item(recommended_item, x_aos_stk):
-                    continue
-                success = True
-                break
-            if not success:
-                error_message = '添加配件失败'
-                StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
-                continue
-            time.sleep(Setting.get().request_interval)
 
         # 进入购物流程
         success = False
@@ -328,6 +330,19 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
                 error_message = '填写礼品卡账单信息失败'
                 StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
                 continue
+
+        # 回到自提步骤
+        success = False
+        for j in range(max_retry_count):
+            print('回到自提步骤')
+            if not apple_util.review_to_fulfillment(x_aos_stk):
+                continue
+            success = True
+            break
+        if not success:
+            error_message = '回到自提步骤失败'
+            StateUtil.get().finish_task(False, None, fail_reason_prefix + error_message)
+            continue
 
         # 上号成功，保存信息
         print('上号成功')

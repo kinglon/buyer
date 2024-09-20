@@ -863,6 +863,78 @@ class AppleUtil:
             print("礼品卡支付失败，错误是：{}".format(e))
             return False
 
+    # 回到自提步骤
+    def review_to_fulfillment(self, x_aos_stk):
+        try:
+            url = self.appstore_host + '/shop/checkoutx/review?_a=edit&_m=checkout.review.fulfillmentReview.reviewGroup-1'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Review'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            body = {
+                'checkout.locationConsent.locationConsent': 'false'
+            }
+
+            self.last_response = self.session.post(url, headers=headers, data=body, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("回到自提步骤失败，错误是：{}".format(self.last_response))
+                return False
+
+            # 失败的话不是Json串，抛异常表示返回失败
+            data = self.last_response.content.decode('utf-8')
+            root = json.loads(data)
+            page_title = AppleUtil.parse_page_title(root)
+            print('页面标题：{}'.format(page_title))
+
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True
+        except Exception as e:
+            print("回到自提步骤失败，错误是：{}".format(e))
+            return False
+
+    # 更新会话
+    def update_session(self, x_aos_stk):
+        try:
+            # 调用接口1
+            url = self.appstore_host + '/shop/checkoutx/session?_a=extendSessionUrl&_m=checkout.session'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Fulfillment'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            self.last_response = self.session.post(url, headers=headers, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("更新会话1失败，错误是：{}".format(self.last_response))
+                return False
+            self.cookies.update(self.last_response.cookies.get_dict())
+
+            # 调用接口2
+            url = self.appstore_host + '/shop/checkoutx/session?_a=extendSession&_m=checkout.session'
+            headers = self.get_common_request_header()
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Referer'] = self.appstore_host + '/shop/checkout?_s=Fulfillment'
+            headers['X-Aos-Stk'] = x_aos_stk
+            headers['X-Requested-With'] = 'Fetch'
+            headers['X-Aos-Model-Page'] = 'checkoutPage'
+
+            self.last_response = self.session.post(url, headers=headers, proxies=self.proxies,
+                                                   timeout=self.timeout)
+            if not self.last_response.ok:
+                print("更新会话2失败，错误是：{}".format(self.last_response))
+                return False
+            self.cookies.update(self.last_response.cookies.get_dict())
+            return True
+        except Exception as e:
+            print("更新会话失败，错误是：{}".format(e))
+            return False
+
     # 确认下单
     def review(self, x_aos_stk):
         try:

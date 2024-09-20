@@ -153,6 +153,18 @@ def test_v2():
         if not apple_util.billing_by_giftcard(x_aos_stk):
             return
 
+    # 回到自提步骤
+    print('回到自提步骤')
+    if not apple_util.review_to_fulfillment(x_aos_stk):
+        return
+
+    # 每隔1分钟更新会话
+    # wait_minutes = 20
+    # for i in range(wait_minutes):
+    #     time.sleep(60)
+    #     print('更新会话')
+    #     apple_util.update_session(x_aos_stk)
+
     # 查询是否有货
     while True:
         print('查询是否有货')
