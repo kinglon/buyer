@@ -7,6 +7,7 @@
 #include "datamodel.h"
 #include "goodsavailabilitychecker.h"
 #include "goodsbuyer.h"
+#include "sessionupdater.h"
 
 class PlanRunner : public QObject
 {
@@ -43,6 +44,9 @@ private:
     // 启动是否有货检测器
     void launchGoodsChecker();
 
+    // 启动会话更新器
+    void launchSessionUpdater();
+
     // 启动购买器
     bool launchGoodsBuyer();
 
@@ -75,6 +79,8 @@ private:
     bool m_requestStop = false;
 
     GoodsAvailabilityChecker* m_goodsChecker = nullptr;
+
+    SessionUpdater* m_sessionUpdater = nullptr;
 
     QVector<GoodsBuyer*> m_goodsBuyers;    
 

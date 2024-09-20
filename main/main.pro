@@ -28,6 +28,7 @@ SOURCES += \
     planmanager.cpp \
     planrunner.cpp \
     proxymanager.cpp \
+    sessionupdater.cpp \
     settingmanager.cpp \
     uiutil.cpp \
     userinfomanager.cpp
@@ -52,6 +53,7 @@ HEADERS += \
     planmanager.h \
     planrunner.h \
     proxymanager.h \
+    sessionupdater.h \
     settingmanager.h \
     uiutil.h \
     userinfomanager.h

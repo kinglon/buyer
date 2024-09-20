@@ -15,35 +15,6 @@
 #define STEP_PROCESS            4   // 处理订单
 #define STEP_QUERY_ORDER_NO     5   // 查询订单号
 
-class BuyParam
-{
-public:
-    // 用户资料
-    UserItem m_user;
-
-    // 购买店铺
-    ShopItem m_buyingShop;
-
-    // Cookies
-    QMap<QString,QString> m_cookies;
-
-    // x_aos_stk
-    QString m_xAosStk;
-
-    // appstore_host
-    QString m_appStoreHost;
-
-    // 开始购买时间, GetTickCount64返回的值，统计耗时使用
-    qint64 m_beginBuyTime = 0;
-
-    // 上号使用的代理IP和端口
-    QString m_proxyIp;
-    int m_proxyPort = 0;
-
-    // 使用的本地IP
-    QString m_localIp;
-};
-
 class BuyResult
 {
 public:

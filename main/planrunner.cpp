@@ -61,6 +61,12 @@ void PlanRunner::stop()
         m_goodsChecker->requestStop();
     }
 
+    if (m_sessionUpdater)
+    {
+        m_sessionUpdater->requestStop();
+        m_sessionUpdater = nullptr;
+    }
+
     for (auto& buyer : m_goodsBuyers)
     {
         buyer->requestStop();
@@ -198,6 +204,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
         emit planStatusChange(m_planId);
         launchGoodsChecker();
+        launchSessionUpdater();
         return true;
     }
 
@@ -270,6 +277,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
         emit planStatusChange(m_planId);
         launchGoodsChecker();
+        launchSessionUpdater();
     });
     timer->start();
 
@@ -434,8 +442,22 @@ void PlanRunner::launchGoodsChecker()
     m_goodsChecker->start();
 }
 
+void PlanRunner::launchSessionUpdater()
+{
+    m_sessionUpdater = new SessionUpdater();
+    m_sessionUpdater->setParams(m_buyParams);
+    connect(m_sessionUpdater, &SessionUpdater::finished, m_sessionUpdater, &QObject::deleteLater);
+    m_sessionUpdater->start();
+}
+
 void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
 {
+    if (m_sessionUpdater)
+    {
+        m_buyParams = m_sessionUpdater->getBuyParams();
+        m_sessionUpdater->requestStop();
+        m_sessionUpdater = nullptr;
+    }
     m_goodsChecker = nullptr;
     if (m_requestStop)
     {

@@ -145,11 +145,15 @@ QString GoodsBuyer::getBodyString(const QMap<QString, QString>& body)
 
 CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
 {
-    ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
-    if (proxyServer.m_ip.isEmpty())
+    ProxyServer proxyServer;
+    if (SettingManager::getInstance()->m_useProxy)
     {
-        qCritical("failed to get a proxy");
-        return nullptr;
+        proxyServer = ProxyManager::getInstance()->getProxyServer();
+        if (proxyServer.m_ip.isEmpty())
+        {
+            qCritical("failed to get a proxy");
+            return nullptr;
+        }
     }
 
     QMap<QString, QString> headers;
