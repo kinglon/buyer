@@ -36,7 +36,7 @@ QString columnGiftNo = QString::fromWCharArray(L"礼品卡号");
 
 UserInfoManager::UserInfoManager()
 {
-    std::wstring excelFilePath = CImPath::GetConfPath() + CURRENT_USER_FILE_NAME;
+    std::wstring excelFilePath = CImPath::GetDataPath() + CURRENT_USER_FILE_NAME;
     QVector<QString> headers;
     loadUserInfo(QString::fromStdWString(excelFilePath), true, headers, m_users);
 }
@@ -246,6 +246,7 @@ bool UserInfoManager::save(const QVector<UserItem>& users)
         xlsx.write(row, column++, user.m_city);
         xlsx.write(row, column++, user.m_street);
         xlsx.write(row, column++, user.m_street2);
+        xlsx.write(row, column++, user.m_giftCardNo);
         row++;
     }
 

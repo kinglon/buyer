@@ -322,3 +322,13 @@ void MainWindow::addLog(QString log)
     QString line = currentTimeString + log;
     ui->logEdit->append(line);
 }
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (!UiUtil::showTipV2(QString::fromWCharArray(L"确定要退出吗?")))
+    {
+        event->ignore();
+        return;
+    }
+    event->accept();
+}

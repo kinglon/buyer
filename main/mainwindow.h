@@ -7,6 +7,7 @@
 #include <QStyledItemDelegate>
 #include <QStyleOptionViewItem>
 #include <QPainter>
+#include <QCloseEvent>
 #include "datamodel.h"
 #include "planitemwidget.h"
 #include "planrunner.h"
@@ -67,6 +68,9 @@ private slots:
     void onStopPlanBtn(QString planId);
 
     void addLog(QString log);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
