@@ -21,6 +21,7 @@
 #include "xlsxworkbook.h"
 #include <QDesktopServices>
 #include <QDir>
+#include "localipmanager.h"
 
 using namespace QXlsx;
 
@@ -375,6 +376,7 @@ bool PlanRunner::loadAddCartResult()
         return false;
     }
 
+    int nextIpIndex = 0;
     QJsonObject root = jsonDocument.object();
     for (auto buyParamJson : root["buy_param"].toArray())
     {
@@ -383,7 +385,6 @@ bool PlanRunner::loadAddCartResult()
         buyParam.m_xAosStk = buyParamJson.toObject()["x_aos_stk"].toString();
         buyParam.m_proxyIp = buyParamJson.toObject()["proxy_ip"].toString();
         buyParam.m_proxyPort = buyParamJson.toObject()["proxy_port"].toInt();
-        buyParam.m_localIp = buyParamJson.toObject()["local_ip"].toString();
 
         QJsonObject cookieJson = buyParamJson.toObject()["cookies"].toObject();
         for (auto& cookieKey : cookieJson.keys())
@@ -399,6 +400,10 @@ bool PlanRunner::loadAddCartResult()
             return false;
         }
         buyParam.m_user = user;
+
+        buyParam.m_localIp = m_localIps[nextIpIndex];
+        nextIpIndex = (nextIpIndex+1) % m_localIps.size();
+
         m_buyParams.append(buyParam);
     }
 
@@ -435,6 +440,7 @@ void PlanRunner::launchGoodsChecker()
         }
     }
     m_goodsChecker->setShops(queryShops);
+    m_goodsChecker->setLocalIps(LocalIpManager::getInstance()->getAllIps());
 
     connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
     connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);

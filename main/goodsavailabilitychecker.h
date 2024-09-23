@@ -26,6 +26,9 @@ public:
     // 设置查询机型码
     void setPhoneCode(QString phoneCode) { m_phoneCode = phoneCode; }
 
+    // 设置本地IP列表
+    void setLocalIps(const QVector<QString>& localIps) { m_localIps = localIps; }
+
 protected:
     void run() override;
 
@@ -34,9 +37,6 @@ protected:
     int getTimeOutSeconds() override { return 5; }
 
 private:
-    // 获取本地IP列表
-    QVector<QString> getLocalIps();    
-
     QVector<ShopItem> queryIfGoodsAvailable();
 
     // 构造一个按邮编查询是否有货的请求，没有指定邮编就随机

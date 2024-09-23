@@ -36,7 +36,8 @@ void ProxyManager::getProxyServer(QVector<ProxyServer>& proxyServers)
     int retryCount = 3;
     for (int i=0; i<retryCount; i++)
     {
-        QString url = QString("http://api.proxy.ipidea.io/getProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions=%1&protocol=socks5");
+        QString url = QString("http://api.proxy.ipidea.io/getBalanceProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions=%1&protocol=socks5")
+                .arg(SettingManager::getInstance()->m_proxyRegion);
         CURL* curl = makeRequest(url, QMap<QString,QString>(), QMap<QString,QString>(), ProxyServer());
         if (curl == nullptr)
         {

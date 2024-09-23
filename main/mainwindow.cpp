@@ -12,6 +12,7 @@
 #include "Utility/ImPath.h"
 #include "settingmanager.h"
 #include "proxymanager.h"
+#include "localipmanager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -24,7 +25,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     initCtrls();
 
-    ProxyManager::getInstance()->start();
+    if (SettingManager::getInstance()->m_useProxy)
+    {
+        ProxyManager::getInstance()->start();
+    }
 }
 
 MainWindow::~MainWindow()
@@ -254,7 +258,15 @@ void MainWindow::onRunPlanBtn(QString planId)
         return;
     }
 
+    QVector<QString> localIps;
+    if (!LocalIpManager::getInstance()->assignIps(plan->m_count, localIps))
+    {
+        UiUtil::showTip(QString::fromWCharArray(L"本地IP数不够"));
+        return;
+    }
+
     planRunner = new PlanRunner(planId, this);
+    planRunner->setLocalIps(localIps);
     connect(planRunner, &PlanRunner::log, this, &MainWindow::addLog);
     connect(planRunner, &PlanRunner::planStatusChange, [this] (QString planId) {
         updatePlanListItemCtrl(planId);
@@ -266,6 +278,7 @@ void MainWindow::onRunPlanBtn(QString planId)
         m_planRunners[planId] = nullptr;
         if (planRunner)
         {
+            LocalIpManager::getInstance()->releaseIps(planRunner->getLocalIps());
             planRunner->deleteLater();
         }
     });
@@ -276,6 +289,7 @@ void MainWindow::onRunPlanBtn(QString planId)
     }
     else
     {
+        LocalIpManager::getInstance()->releaseIps(planRunner->getLocalIps());
         planRunner->deleteLater();
     }
 }

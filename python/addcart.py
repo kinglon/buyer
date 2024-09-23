@@ -16,12 +16,12 @@ from setting import Setting
 import socket
 
 
-# 获取代理IP列表，返回（success, proxy ips, message）
+# 获取代理IP列表，返回（success, proxy ips, request_ip, message）
 def get_proxy_server_list(proxy_region):
     no_proxy_server = {"http": "", "https": ""}
-    error = (False, [], '')
+    error = (False, [], '', '')
     try:
-        url = ("http://api.proxy.ipidea.io/getProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
+        url = ("http://api.proxy.ipidea.io/getBalanceProxyIp?big_num=900&return_type=json&lb=1&sb=0&flow=1&regions={}&protocol=socks5"
                .format(proxy_region))
         response = requests.get(url, proxies=no_proxy_server, timeout=10)
         if not response.ok:
@@ -31,9 +31,9 @@ def get_proxy_server_list(proxy_region):
             data = response.content.decode('utf-8')
             data = json.loads(data)
             if data['success']:
-                return True, data['data'], ''
+                return True, data['data'], data['request_ip'], ''
             else:
-                return True, [], data['msg']
+                return True, [], '', data['msg']
     except Exception as e:
         print("获取代理IP列表失败，错误是：{}".format(e))
         return error
@@ -352,7 +352,6 @@ def add_cart(proxys, users, local_ips, phone_model, recommended_item):
             'x_aos_stk': x_aos_stk,
             'proxy_ip': '',
             "proxy_port": 0,
-            "local_ip": local_ip,
             'cookies': apple_util.cookies
         }
         if len(proxy_ip) > 0:
@@ -373,14 +372,6 @@ def main():
     print('开始')
 
     try:
-        # 获取本地IP列表
-        print('获取本地IP列表')
-        local_ips = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")]
-        if len(local_ips) == 0:
-            StateUtil.get().set_finish('本地IP个数为0')
-            return
-        print('本地IP个数是{}'.format(len(local_ips)))
-
         # 加载参数
         print("加载参数")
         param_file_path = os.path.join(work_path, 'python_args.json')
@@ -400,11 +391,13 @@ def main():
 
         # 获取代理IP列表
         proxy_server_list = []
+        local_ips = []
         if use_proxy:
             message = ''
+            request_ip = ''
             for i in range(3):
                 print('获取代理IP列表')
-                success, proxy_server_list, message = get_proxy_server_list(proxy_region)
+                success, proxy_server_list, request_ip, message = get_proxy_server_list(proxy_region)
                 if not success:
                     continue
                 break
@@ -414,6 +407,15 @@ def main():
                 print(message)
                 StateUtil.get().set_finish(message)
                 return
+            local_ips.append(request_ip)
+        else:
+            # 获取本地IP列表
+            print('获取本地IP列表')
+            local_ips = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")]
+            if len(local_ips) == 0:
+                StateUtil.get().set_finish('本地IP个数为0')
+                return
+            print('本地IP个数是{}'.format(len(local_ips)))
 
         # 多线程并发
         threads = []

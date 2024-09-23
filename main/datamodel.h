@@ -70,7 +70,8 @@ public:
     {
         if (m_accountName.isEmpty() || m_password.isEmpty() || m_firstName.isEmpty() || m_lastName.isEmpty()
                 || m_telephone.isEmpty() || m_email.isEmpty() || m_postalCode.isEmpty()
-                || m_state.isEmpty() || m_city.isEmpty() || m_street.isEmpty())
+                || m_state.isEmpty() || m_city.isEmpty() || m_street.isEmpty()
+                || (m_giftCardNo.isEmpty() && m_creditCardNo.isEmpty()))
         {
             return false;
         }

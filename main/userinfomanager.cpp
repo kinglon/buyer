@@ -132,7 +132,7 @@ bool UserInfoManager::loadUserInfo(QString excelFilePath, bool , QVector<QString
             Cell* cell = xlsx.cellAt(row, column);
             if (cell == nullptr)
             {
-                break;
+                continue;
             }
 
             QString columnName = headers[column-1];

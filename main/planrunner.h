@@ -21,6 +21,10 @@ public:
 
     void stop();
 
+    void setLocalIps(const QVector<QString>& localIps) { m_localIps = localIps; }
+
+    QVector<QString> getLocalIps() { return m_localIps; }
+
 signals:
     void log(QString content);
 
@@ -92,6 +96,9 @@ private:
 
     // 用于定时购买倒计时
     int m_elapseSeconds = 24*3600;
+
+    // 本地IP列表
+    QVector<QString> m_localIps;
 };
 
 #endif // PLANRUNNER_H

@@ -20,6 +20,7 @@ SOURCES += \
     goodsavailabilitychecker.cpp \
     goodsbuyer.cpp \
     httpthread.cpp \
+    localipmanager.cpp \
     main.cpp \
     mainwindow.cpp \
     multiselectiondialog.cpp \
@@ -46,6 +47,7 @@ HEADERS += \
     goodsavailabilitychecker.h \
     goodsbuyer.h \
     httpthread.h \
+    localipmanager.h \
     mainwindow.h \
     multiselectiondialog.h \
     plandialog.h \
