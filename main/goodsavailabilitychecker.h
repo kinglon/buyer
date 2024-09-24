@@ -78,6 +78,9 @@ private:
 
     // 轮询使用本地IP，标识下一个使用的IP索引
     int m_nextLocalIpIndex = 0;
+
+    // 店铺查询次数，用于统计
+    QMap<QString, int> m_shopQueryCount;
 };
 
 #endif // GOODSAVAILABILITYCHECKER_H

@@ -33,6 +33,12 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
         curl_multi_add_handle(multiHandle, curl);
     }
 
+    // 初始化每个店铺查询次数
+    for (const auto& shop : m_shops)
+    {
+        m_shopQueryCount[shop.m_storeNumber] = 0;
+    }
+
     int64_t lastReportLogTime = GetTickCount64();
 
     QVector<ShopItem> availShops;
@@ -113,10 +119,24 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
             }
         }
 
-        if (GetTickCount64() - lastReportLogTime >= 5000)
+        int elapse = GetTickCount64() - lastReportLogTime;
+        if (elapse >= 10000)
         {
-            emit printLog(QString::fromWCharArray(L"店铺没货"));
+            QString shopQueryCountString;
+            for (auto it=m_shopQueryCount.begin(); it!=m_shopQueryCount.end(); it++)
+            {
+                shopQueryCountString += ", " + it.key() + "=" + it.value();
+            }
+            QString logContent = QString::fromWCharArray(L"店铺没货, skuid=%1, 时长=%2, IP=%3/%4")
+                    .arg(m_phoneCode, QString::number(elapse), QString::number(m_nextLocalIpIndex), QString::number(m_localIps.size()));
+            logContent += shopQueryCountString;
+            emit printLog(logContent);
+
             lastReportLogTime = GetTickCount64();
+            for (auto it=m_shopQueryCount.begin(); it!=m_shopQueryCount.end(); it++)
+            {
+                it.value() = 0;
+            }
         }
     }
 
@@ -216,6 +236,11 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
 
             if (!partsJsonObject["buyability"].toObject()["isBuyable"].toBool())
             {
+                auto it = m_shopQueryCount.find(storeNumber);
+                if (it != m_shopQueryCount.end())
+                {
+                    m_shopQueryCount[storeNumber] += 1;
+                }
                 continue;
             }
 
@@ -238,7 +263,6 @@ void GoodsAvailabilityChecker::run()
         qCritical("param is wrong");
         emit checkFinish(nullptr);
         return;
-
     }
 
     m_reqIntervalMs = SettingManager::getInstance()->m_queryGoodInterval;
