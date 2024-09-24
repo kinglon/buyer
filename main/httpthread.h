@@ -39,6 +39,9 @@ protected:
     // 获取服务端的Set-Cookies
     QMap<QString, QString> getCookies(CURL* curl);
 
+    // 获取服务端返回的跳转地址，返回302时有效
+    QString getLocationHeader(CURL* curl);
+
     void freeRequest(CURL* curl);
 
 private:

@@ -10,8 +10,7 @@
 #include "datamodel.h"
 
 // 步骤
-#define STEP_SESSION1   1
-#define STEP_SESSION2   2
+#define STEP_CHECK_EXPIRED  1   // 检测是否过期
 
 class SessionUserData
 {
@@ -20,7 +19,13 @@ public:
     BuyParam m_buyParam;
 
     // 步骤
-    int m_step = STEP_SESSION1;
+    int m_step = STEP_CHECK_EXPIRED;
+
+    // 重试次数
+    int m_retry = 0;
+
+    // 更新结果
+    bool m_success = false;
 };
 
 
@@ -43,10 +48,17 @@ protected:
 
     int getTimeOutSeconds() override { return 20; }
 
+signals:
+    void printLog(QString logContent);
+
+    void sessionExpired();
+
 private:
     CURL* makeSessionUpdateRequest(SessionUserData* userData);
 
     void handleResponse(CURL* curl);    
+
+    void retry(CURL* curl);
 
 private:
     QMutex m_mutex;

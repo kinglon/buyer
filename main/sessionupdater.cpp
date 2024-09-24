@@ -9,6 +9,8 @@
 #include "settingmanager.h"
 #include "proxymanager.h"
 
+#define MAX_RETRY_COUNT 2
+
 SessionUpdater::SessionUpdater(QObject *parent)
     : HttpThread{parent}
 {
@@ -52,7 +54,7 @@ void SessionUpdater::run()
         {
             SessionUserData userData;
             userData.m_buyParam = m_buyParams[i];
-            userData.m_step = STEP_SESSION1;
+            userData.m_step = STEP_CHECK_EXPIRED;
             userDatas.append(userData);
         }
         m_mutex.unlock();
@@ -69,12 +71,13 @@ void SessionUpdater::run()
 
         qInfo("begin to do the session updating, count is %d", userDatas.size());
 
-        while (!m_requestStop)
+        int stillRunning = 1;
+        while (!m_requestStop && stillRunning)
         {
             int numfds = 0;
             curl_multi_wait(m_multiHandle, NULL, 0, 100, &numfds);
 
-            int stillRunning = 0;
+
             CURLMcode mc = curl_multi_perform(m_multiHandle, &stillRunning);
             if (mc)
             {
@@ -82,29 +85,28 @@ void SessionUpdater::run()
                 break;
             }
 
-            if (stillRunning == 0)
+            while (true)
             {
-                break;
-            }
+                int msgs_left = 0;
+                CURLMsg *m = curl_multi_info_read(m_multiHandle, &msgs_left);
+                if (m == nullptr)
+                {
+                    break;
+                }
 
-            int msgs_left = 0;
-            CURLMsg *m = curl_multi_info_read(m_multiHandle, &msgs_left);
-            if (m == nullptr)
-            {
-                continue;
-            }
+                if (m->msg == CURLMSG_DONE && m->data.result == CURLE_OK)
+                {
+                    handleResponse(m->easy_handle);
+                }
+                else
+                {
+                    qCritical("failed to send request, error is %d", m->data.result);
+                    retry(m->easy_handle);
+                }
 
-            if (m->msg == CURLMSG_DONE && m->data.result == CURLE_OK)
-            {
-                handleResponse(m->easy_handle);
+                curl_multi_remove_handle(m_multiHandle, m->easy_handle);
+                freeRequest(m->easy_handle);
             }
-            else
-            {
-                qCritical("failed to send request, error is %d", m->data.result);
-            }
-
-            curl_multi_remove_handle(m_multiHandle, m->easy_handle);
-            freeRequest(m->easy_handle);
         }
 
         // 释放所有请求
@@ -120,6 +122,21 @@ void SessionUpdater::run()
         }
 
         qInfo("finish to do the session updating");
+
+        // 统计报告下
+        int successCount = 0;
+        for (auto& userData : userDatas)
+        {
+            if (userData.m_success)
+            {
+                successCount++;
+            }
+        }
+
+        QString logContent = QString::fromWCharArray(L"更新会话，总共%1, 成功%2, 失败%3")
+                .arg(QString::number(userDatas.size()), QString::number(successCount),
+                                     QString::number(userDatas.size()-successCount));
+        emit printLog(logContent);
     }
     curl_multi_cleanup(m_multiHandle);
 }
@@ -139,46 +156,19 @@ CURL* SessionUpdater::makeSessionUpdateRequest(SessionUserData* userData)
 
     QMap<QString, QString> headers;
     headers["origin"] = "https://www.apple.com/jp";
-    headers["Referer"] = "https://www.apple.com/jp";
-    headers["Syntax"] = "graviton";
-    headers["Modelversion"] = "v2";
+    headers["Referer"] = "https://www.apple.com/jp";    
 
     CURL* curl = nullptr;
-    if (userData->m_step == STEP_SESSION1)
+    if (userData->m_step == STEP_CHECK_EXPIRED)
     {
-        QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx/session?_a=extendSessionUrl&_m=checkout.session");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
-                + "/shop/checkout?_s=Fulfillment";
+        QString url = "https://www.apple.com/jp/shop/checkout";
+        headers["Referer"] = "https://www.apple.com";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
-        if (curl)
-        {
-            setPostMethod(curl, "");
-        }
-    }
-    else if (userData->m_step == STEP_SESSION2)
-    {
-        QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx/session?_a=extendSession&_m=checkout.session");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
-                + "/shop/checkout?_s=Fulfillment";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
-        if (curl)
-        {
-            setPostMethod(curl, "");
-        }
     }
 
     if (curl == nullptr)
     {
+        qCritical("failed to make request");
         return nullptr;
     }
 
@@ -205,6 +195,7 @@ void SessionUpdater::handleResponse(CURL* curl)
     if (!(statusCode >= 200 && statusCode < 400))
     {
         qCritical("the response of updating session report error: %d", statusCode);
+        retry(curl);
         return;
     }
 
@@ -233,9 +224,48 @@ void SessionUpdater::handleResponse(CURL* curl)
     }
     m_mutex.unlock();
 
-    if (userData->m_step == STEP_SESSION1)
+    if (userData->m_step == STEP_CHECK_EXPIRED)
     {
-        userData->m_step = STEP_SESSION2;
+        if (statusCode == 200)
+        {
+            userData->m_success = true;
+        }
+        else
+        {
+            if (statusCode == 302)
+            {
+                QString location = getLocationHeader(curl);
+                if (location.indexOf("session_expired") > 0)
+                {
+                    if (!m_requestStop)
+                    {
+                        qInfo("session expired");
+                        emit sessionExpired();
+                        m_requestStop = true;
+                    }
+                    return;
+                }
+            }
+
+            qCritical("the status of checking expired is %d", statusCode);
+            retry(curl);
+        }
+    }
+}
+
+void SessionUpdater::retry(CURL* curl)
+{
+    SessionUserData* userData = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_PRIVATE, &userData);
+    if (userData == nullptr)
+    {
+        return;
+    }
+
+    if (userData->m_retry < MAX_RETRY_COUNT)
+    {
+        qInfo("retry to update session, ip is %s", userData->m_buyParam.m_localIp.toStdString().c_str());
+        userData->m_retry += 1;
         CURL* nextCurl = makeSessionUpdateRequest(userData);
         if (nextCurl)
         {

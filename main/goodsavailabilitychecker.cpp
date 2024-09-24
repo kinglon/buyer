@@ -94,14 +94,6 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
             {
                 break;
             }
-            else
-            {
-                CURL* curl = makeQueryRequest("");
-                if (curl)
-                {
-                    curl_multi_add_handle(multiHandle, curl);
-                }
-            }
         }
 
         if (!availShops.empty())
@@ -125,7 +117,7 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
             QString shopQueryCountString;
             for (auto it=m_shopQueryCount.begin(); it!=m_shopQueryCount.end(); it++)
             {
-                shopQueryCountString += ", " + it.key() + "=" + it.value();
+                shopQueryCountString += ", " + it.key() + "=" + QString::number(it.value());
             }
             QString logContent = QString::fromWCharArray(L"店铺没货, skuid=%1, 时长=%2, IP=%3/%4")
                     .arg(m_phoneCode, QString::number(elapse), QString::number(m_nextLocalIpIndex), QString::number(m_localIps.size()));

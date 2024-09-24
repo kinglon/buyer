@@ -25,6 +25,8 @@ public:
 
     QVector<QString> getLocalIps() { return m_localIps; }
 
+    bool isRestart() { return m_restart; }
+
 signals:
     void log(QString content);
 
@@ -73,6 +75,9 @@ private slots:
     // 购买完成
     void onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults);
 
+    // 会话过期
+    void onSessionExpired();
+
 private:
     QString m_planId;
 
@@ -99,6 +104,9 @@ private:
 
     // 本地IP列表
     QVector<QString> m_localIps;
+
+    // 标志是否重启
+    bool m_restart = false;
 };
 
 #endif // PLANRUNNER_H

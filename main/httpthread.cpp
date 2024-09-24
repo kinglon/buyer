@@ -175,6 +175,31 @@ QMap<QString, QString> HttpThread::getCookies(CURL* curl)
     return cookies;
 }
 
+QString HttpThread::getLocationHeader(CURL* curl)
+{
+    QString location;
+    auto it = m_responseHeaders.find(curl);
+    if (it == m_responseHeaders.end())
+    {
+        return location;
+    }
+
+    std::string& headers = *it.value();
+    size_t pos = headers.find("Location:");
+    if (pos != std::string::npos)
+    {
+        pos += sizeof("Location:");
+        size_t end = headers.find("\r\n", pos);
+        if (end != std::string::npos)
+        {
+            std::string locationHeader = headers.substr(pos, end - pos);
+            location = QString::fromStdString(locationHeader);
+        }
+    }
+
+    return location;
+}
+
 void HttpThread::freeRequest(CURL* curl)
 {    
     auto itBody = m_bodies.find(curl);

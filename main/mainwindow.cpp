@@ -100,7 +100,7 @@ QListWidgetItem* MainWindow::getPlanListItem(QString planId)
     return nullptr;
 }
 
-bool MainWindow::createPlanDataDirectory(QString planName)
+bool MainWindow::createPlanDataDirectory(QString planName, bool tip)
 {
     // 重建计划数据目录
     QString planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + planName;
@@ -109,7 +109,7 @@ bool MainWindow::createPlanDataDirectory(QString planName)
         QDir folderDir(planDataPath);
         if (folderDir.exists())
         {
-            if (!UiUtil::showTipV2(QString::fromWCharArray(L"原来购买数据将被清空，是否继续？")))
+            if (tip && !UiUtil::showTipV2(QString::fromWCharArray(L"原来购买数据将被清空，是否继续？")))
             {
                 return false;
             }
@@ -230,6 +230,11 @@ void MainWindow::onDeletePlanBtn(QString planId)
 
 void MainWindow::onRunPlanBtn(QString planId)
 {
+    runPlan(planId, false);
+}
+
+void MainWindow::runPlan(QString planId, bool restart)
+{
     if (SettingManager::getInstance()->m_useProxy)
     {
         ProxyServer proxyServer = ProxyManager::getInstance()->getProxyServer();
@@ -253,7 +258,7 @@ void MainWindow::onRunPlanBtn(QString planId)
         return;
     }
 
-    if (!createPlanDataDirectory(plan->m_name))
+    if (!createPlanDataDirectory(plan->m_name, !restart))
     {
         return;
     }
@@ -276,10 +281,17 @@ void MainWindow::onRunPlanBtn(QString planId)
         updatePlanListItemCtrl(planId);
         PlanRunner* planRunner = m_planRunners[planId];
         m_planRunners[planId] = nullptr;
+        bool restart = false;
         if (planRunner)
         {
+            restart = planRunner->isRestart();
             LocalIpManager::getInstance()->releaseIps(planRunner->getLocalIps());
             planRunner->deleteLater();
+        }
+
+        if (!success && restart)
+        {
+            runPlan(planId, true);
         }
     });
 

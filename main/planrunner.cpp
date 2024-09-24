@@ -452,6 +452,8 @@ void PlanRunner::launchSessionUpdater()
 {
     m_sessionUpdater = new SessionUpdater();
     m_sessionUpdater->setParams(m_buyParams);
+    connect(m_sessionUpdater, &SessionUpdater::sessionExpired, this, &PlanRunner::onSessionExpired);
+    connect(m_sessionUpdater, &SessionUpdater::printLog, this, &PlanRunner::printLog);
     connect(m_sessionUpdater, &SessionUpdater::finished, m_sessionUpdater, &QObject::deleteLater);
     m_sessionUpdater->start();
 }
@@ -557,6 +559,14 @@ void PlanRunner::onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResu
     {
         finishPlan();
     }
+}
+
+void PlanRunner::onSessionExpired()
+{
+    m_sessionUpdater = nullptr;
+    m_restart = true;
+    printLog(QString::fromWCharArray(L"检测到会话过期，重新启动购买计划"));
+    stop();
 }
 
 bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
