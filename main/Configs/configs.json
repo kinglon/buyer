@@ -4,7 +4,7 @@
     "use_proxy": false,
     "addcart_use_proxy": true,
     "proxy_region": "jp",
-    "query_good_interval": 100,
+    "query_good_interval": 60,
     "stop_step": 100,
     "use_cache_addcart": false,
     "network_request_interval": 2,

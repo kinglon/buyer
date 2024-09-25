@@ -11,6 +11,7 @@
 
 // 步骤
 #define STEP_CHECK_EXPIRED  1   // 检测是否过期
+#define STEP_EXTEND_SESSION 2   // 延长会话
 
 class SessionUserData
 {

@@ -84,6 +84,14 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
                 {
                     parseQueryShopData(data, availShops);
                 }
+                else
+                {
+                    qCritical("failed to do query goods request, status is %d", statusCode);
+                }
+            }
+            else
+            {
+                qCritical("failed to send query goods request, error is %d", m->data.result);
             }
 
             curl_multi_remove_handle(multiHandle, m->easy_handle);
@@ -92,6 +100,17 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
 
             if (!availShops.empty())
             {
+                break;
+            }
+
+            // 超过间隔时间没有再发送，继续发送
+            if (GetTickCount64() - m_lastSendReqTimeMs > m_reqIntervalMs)
+            {
+                CURL* curl = makeQueryRequest("");
+                if (curl)
+                {
+                    curl_multi_add_handle(multiHandle, curl);
+                }
                 break;
             }
         }
@@ -188,7 +207,7 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
     if (jsonDocument.isNull() || jsonDocument.isEmpty())
     {
-        qCritical("failed to parse json, data is %s", data.toStdString().c_str());
+        qCritical("failed to parse json");
         return;
     }
 

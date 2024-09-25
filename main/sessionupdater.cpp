@@ -106,6 +106,9 @@ void SessionUpdater::run()
 
                 curl_multi_remove_handle(m_multiHandle, m->easy_handle);
                 freeRequest(m->easy_handle);
+
+                // 有可能又添加了新请求
+                stillRunning = true;
             }
         }
 
@@ -164,6 +167,24 @@ CURL* SessionUpdater::makeSessionUpdateRequest(SessionUserData* userData)
         QString url = "https://www.apple.com/jp/shop/checkout";
         headers["Referer"] = "https://www.apple.com";
         curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+    }
+    else if (userData->m_step == STEP_EXTEND_SESSION)
+    {
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/session?_a=extendSession&_m=checkout.session");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["Syntax"] = "graviton";
+        headers["Modelversion"] = "v2";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
+        headers["X-Aos-Model-Page"] = "checkoutPage";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Fulfillment";
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+        if (curl)
+        {
+            setPostMethod(curl, "");
+        }
     }
 
     if (curl == nullptr)
@@ -228,7 +249,13 @@ void SessionUpdater::handleResponse(CURL* curl)
     {
         if (statusCode == 200)
         {
-            userData->m_success = true;
+            userData->m_retry = 0;
+            userData->m_step = STEP_EXTEND_SESSION;
+            CURL* nextCurl = makeSessionUpdateRequest(userData);
+            if (nextCurl)
+            {
+                curl_multi_add_handle(m_multiHandle, nextCurl);
+            }
         }
         else
         {
@@ -248,6 +275,18 @@ void SessionUpdater::handleResponse(CURL* curl)
             }
 
             qCritical("the status of checking expired is %d", statusCode);
+            retry(curl);
+        }
+    }
+    else if (userData->m_step == STEP_EXTEND_SESSION)
+    {
+        if (statusCode == 200)
+        {
+            userData->m_success = true;
+        }
+        else
+        {
+            qCritical("the status of extending session is %d", statusCode);
             retry(curl);
         }
     }
