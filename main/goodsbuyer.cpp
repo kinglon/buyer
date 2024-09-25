@@ -9,6 +9,8 @@
 #include <QJsonArray>
 #include <QUrlQuery>
 #include <QRandomGenerator>
+#include <QFile>
+#include <QTextStream>
 #include "settingmanager.h"
 #include "proxymanager.h"
 
@@ -366,6 +368,13 @@ void GoodsBuyer::handleResponse(CURL* curl)
     bool canNextStep = true;
     if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
+        static bool save = false;
+        if (!save)
+        {
+            save = true;
+            saveDataToFile(responseData, "STEP_QUERY_DATETIME.txt");
+        }
+
         handleQueryDateTimeResponse(userData, responseData);
 
         QString checkInStart;
@@ -388,10 +397,24 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
+        static bool save = false;
+        if (!save)
+        {
+            save = true;
+            saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
+        }
+
         userData->m_buyResult.m_currentStep = STEP_REVIEW;
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
+        static bool save = false;
+        if (!save)
+        {
+            save = true;
+            saveDataToFile(responseData, "STEP_REVIEW.txt");
+        }
+
         qint64 totalTime = GetTickCount64() - userData->m_buyParam.m_beginBuyTime;
         QString takeTime = QString::fromWCharArray(L"总%1").arg(totalTime);
         userData->m_buyResult.m_takeTimes.append(takeTime);
@@ -399,6 +422,13 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
+        static bool save = false;
+        if (!save)
+        {
+            save = true;
+            saveDataToFile(responseData, "STEP_PROCESS.txt");
+        }
+
         if (!handleProcessResponse(userData, responseData))
         {
             userData->m_buyResult.m_currentStep = STEP_PROCESS;
@@ -649,4 +679,20 @@ void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QS
     QString base64CipherText = QString::fromUtf8(base64ByteArray);
     cardNoCipher = QString("{\"cipherText\":\"%1\",\"publicKeyHash\":\"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=\"}")
             .arg(base64CipherText);
+}
+
+void GoodsBuyer::saveDataToFile(const QString& data, QString fileName)
+{
+    qInfo("save data to file: %s", fileName.toStdString().c_str());
+
+    QFile file(QString("C:\\") + fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        return;
+    }
+
+    QTextStream out(&file);
+    out << data;
+
+    file.close();
 }

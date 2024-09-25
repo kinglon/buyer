@@ -141,6 +141,9 @@ private:
 
     void getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QString& cardNoCipher);
 
+    // 将data保存在C盘指定的文件名下
+    void saveDataToFile(const QString& data, QString fileName);
+
 private:
     bool m_requestStop = false;
 
