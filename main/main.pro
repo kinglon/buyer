@@ -16,6 +16,7 @@ SOURCES += \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
     datamodel.cpp \
+    debugdialog.cpp \
     fixtimebuyer.cpp \
     goodsavailabilitychecker.cpp \
     goodsbuyer.cpp \
@@ -43,6 +44,7 @@ HEADERS += \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
     datamodel.h \
+    debugdialog.h \
     fixtimebuyer.h \
     goodsavailabilitychecker.h \
     goodsbuyer.h \
@@ -61,6 +63,7 @@ HEADERS += \
     userinfomanager.h
 
 FORMS += \
+    debugdialog.ui \
     mainwindow.ui \
     multiselectiondialog.ui \
     plandialog.ui \

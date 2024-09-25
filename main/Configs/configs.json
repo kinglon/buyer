@@ -8,6 +8,7 @@
     "stop_step": 100,
     "use_cache_addcart": false,
     "network_request_interval": 2,
+    "enable_select_fulfillment_datetime": false,
     "shop": [
         {
             "id": "R128",

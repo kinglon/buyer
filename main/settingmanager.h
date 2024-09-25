@@ -44,6 +44,9 @@ public:
     // 停止步骤，开发调试使用
     int m_stopStep = 100;
 
+    // 标志自提是否需要选择日期和时间
+    bool m_enableSelectFulfillmentDatetime = false;
+
     // 店铺列表
     QVector<ShopItem> m_shops;
 

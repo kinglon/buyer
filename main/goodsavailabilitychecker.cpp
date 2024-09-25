@@ -10,7 +10,8 @@
 GoodsAvailabilityChecker::GoodsAvailabilityChecker(QObject *parent)
     : HttpThread{parent}
 {
-
+    m_queryShopPostalCodes.push_back("600-8006");
+    m_queryShopPostalCodes.push_back("100-0005");
 }
 
 QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
@@ -22,10 +23,10 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
         return QVector<ShopItem>();
     }
 
-    // 每个店铺都发送一个请求
-    for (const auto& shop : m_shops)
+    // 每个查询店铺都发送一个请求
+    for (const auto& postalCode : m_queryShopPostalCodes)
     {
-        CURL* curl = makeQueryRequest(shop.m_postalCode);
+        CURL* curl = makeQueryRequest(postalCode);
         if (curl == nullptr)
         {
             break;
@@ -176,8 +177,8 @@ CURL* GoodsAvailabilityChecker::makeQueryRequest(QString postal)
 
     if (postal.isEmpty())
     {
-        int randIndex = rand() % m_shops.size();
-        postal = m_shops[randIndex].m_postalCode;
+        postal = m_queryShopPostalCodes[m_nextQueryPostalCodeIndex];
+        m_nextQueryPostalCodeIndex = (m_nextQueryPostalCodeIndex+1) % m_queryShopPostalCodes.size();
     }
 
     QString url = APPLE_HOST + QString("/shop/fulfillment-messages?pl=true&mts.0=regular&cppart=UNLOCKED_JP&parts.0=%1/A&location=%2").arg(m_phoneCode, postal);

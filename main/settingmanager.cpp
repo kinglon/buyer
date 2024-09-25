@@ -58,6 +58,7 @@ void SettingManager::load()
     {
         m_useCacheAddCartResult = root["use_cache_addcart"].toBool();
     }
+    m_enableSelectFulfillmentDatetime = root["enable_select_fulfillment_datetime"].toBool();
 
     QJsonArray shops = root["shop"].toArray();
     for (auto shop : shops)

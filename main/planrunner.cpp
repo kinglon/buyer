@@ -74,6 +74,14 @@ void PlanRunner::stop()
     }
 }
 
+void PlanRunner::mockHaveGoods()
+{
+    if (m_goodsChecker)
+    {
+        m_goodsChecker->mockFinish();
+    }
+}
+
 void PlanRunner::printLog(const QString& content)
 {
     QString contentWithPrefix = "["+m_planName+"] "+content;

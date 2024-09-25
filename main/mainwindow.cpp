@@ -13,6 +13,7 @@
 #include "settingmanager.h"
 #include "proxymanager.h"
 #include "localipmanager.h"
+#include "debugdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,6 +23,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     setWindowFlags(windowFlags() & ~Qt::WindowMaximizeButtonHint);
     setWindowFlag(Qt::MSWindowsFixedSizeDialogHint, true);
+
+    m_ctrlDShortcut = new QShortcut(QKeySequence("Ctrl+D"), this);
+    connect(m_ctrlDShortcut, &QShortcut::activated, this, &MainWindow::onCtrlDShortcut);
 
     initCtrls();
 
@@ -333,6 +337,16 @@ void MainWindow::addLog(QString log)
     QString currentTimeString = currentDateTime.toString("[MM-dd hh:mm:ss] ");
     QString line = currentTimeString + log;
     ui->logEdit->append(line);
+}
+
+void MainWindow::onCtrlDShortcut()
+{
+    DebugDialog debugDlg;
+    connect(&debugDlg, &DebugDialog::mockHaveGoods, [this] {
+        m_planRunners.begin().value()->mockHaveGoods();
+    });
+    debugDlg.show();
+    debugDlg.exec();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

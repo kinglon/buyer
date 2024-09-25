@@ -81,6 +81,12 @@ private:
 
     // 店铺查询次数，用于统计
     QMap<QString, int> m_shopQueryCount;
+
+    // 用于查询的店铺，会搜索附近的，所以不需要每个店铺查询
+    QVector<QString> m_queryShopPostalCodes;
+
+    // 下一个查询索引
+    int m_nextQueryPostalCodeIndex = 0;
 };
 
 #endif // GOODSAVAILABILITYCHECKER_H

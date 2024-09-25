@@ -27,6 +27,8 @@ public:
 
     bool isRestart() { return m_restart; }
 
+    void mockHaveGoods();
+
 signals:
     void log(QString content);
 

@@ -8,6 +8,7 @@
 #include <QStyleOptionViewItem>
 #include <QPainter>
 #include <QCloseEvent>
+#include <QShortcut>
 #include "datamodel.h"
 #include "planitemwidget.h"
 #include "planrunner.h"
@@ -71,6 +72,8 @@ private slots:
 
     void addLog(QString log);
 
+    void onCtrlDShortcut();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
@@ -78,5 +81,7 @@ private:
     Ui::MainWindow *ui;
 
     QMap<QString, PlanRunner*> m_planRunners;
+
+    QShortcut* m_ctrlDShortcut = nullptr;
 };
 #endif // MAINWINDOW_H

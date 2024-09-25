@@ -35,7 +35,14 @@ void GoodsBuyer::run()
     {
         BuyUserData* userData = new BuyUserData();
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
-        userData->m_buyResult.m_currentStep = STEP_QUERY_DATETIME;
+        if (SettingManager::getInstance()->m_enableSelectFulfillmentDatetime)
+        {
+            userData->m_buyResult.m_currentStep = STEP_QUERY_DATETIME;
+        }
+        else
+        {
+            userData->m_buyResult.m_currentStep = STEP_SELECT_SHOP;
+        }
         userData->m_buyResult.m_localIp = m_buyParams[i].m_localIp;
         userData->m_buyParam = m_buyParams[i];
         QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
