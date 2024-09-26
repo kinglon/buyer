@@ -125,6 +125,7 @@ bool MainWindow::createPlanDataDirectory(QString planName, bool tip)
             }
         }
         CreateDirectory(planDataPath.toStdWString().c_str(), nullptr);
+        QThread::msleep(100);
     }
 
     return true;

@@ -233,6 +233,9 @@ public:
 
     // 使用的本地IP
     QString m_localIp;
+
+    // 是否启用调试
+    bool m_enableDebug = false;
 };
 
 #endif // DATAMODEL_H

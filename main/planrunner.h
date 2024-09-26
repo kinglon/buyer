@@ -49,6 +49,9 @@ private:
     // 加载上号成功的数据
     bool loadAddCartResult();
 
+    // 进入监控流程
+    void enterMonitorProcess();
+
     // 启动是否有货检测器
     void launchGoodsChecker();
 

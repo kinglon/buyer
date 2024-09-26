@@ -368,10 +368,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     bool canNextStep = true;
     if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
-        static bool save = false;
-        if (!save)
+        if (userData->m_buyParam.m_enableDebug)
         {
-            save = true;
             saveDataToFile(responseData, "STEP_QUERY_DATETIME.txt");
         }
 
@@ -397,10 +395,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
-        static bool save = false;
-        if (!save)
+        if (userData->m_buyParam.m_enableDebug)
         {
-            save = true;
             saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
         }
 
@@ -408,10 +404,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
-        static bool save = false;
-        if (!save)
+        if (userData->m_buyParam.m_enableDebug)
         {
-            save = true;
             saveDataToFile(responseData, "STEP_REVIEW.txt");
         }
 
@@ -422,10 +416,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
-        static bool save = false;
-        if (!save)
+        if (userData->m_buyParam.m_enableDebug)
         {
-            save = true;
             saveDataToFile(responseData, "STEP_PROCESS.txt");
         }
 
@@ -685,7 +677,7 @@ void GoodsBuyer::saveDataToFile(const QString& data, QString fileName)
 {
     qInfo("save data to file: %s", fileName.toStdString().c_str());
 
-    QFile file(QString("C:\\") + fileName);
+    QFile file(m_planDataPath + "\\" + fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
         return;

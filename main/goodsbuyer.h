@@ -113,7 +113,9 @@ public:
 public:
     void requestStop() { m_requestStop = true; }
 
-    void setParams(const QVector<BuyParam>& params) { m_buyParams = params; }    
+    void setParams(const QVector<BuyParam>& params) { m_buyParams = params; }
+
+    void setPlanDataPath(QString planDataPath) { m_planDataPath = planDataPath; }
 
 protected:
     void run() override;
@@ -152,6 +154,9 @@ private:
     QVector<BuyParam> m_buyParams;
 
     QVector<BuyResult> m_buyResults;
+
+    // 购买计划数据目录，尾部有斜杆
+    QString m_planDataPath;
 };
 
 #endif // GOODSBUYER_H

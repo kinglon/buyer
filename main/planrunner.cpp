@@ -283,10 +283,7 @@ bool PlanRunner::launchAddCartRunner(PlanItem* plan)
         }
 
         printLog(QString::fromWCharArray(L"上号成功"));
-        PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
-        emit planStatusChange(m_planId);
-        launchGoodsChecker();
-        launchSessionUpdater();
+        enterMonitorProcess();
     });
     timer->start();
 
@@ -421,7 +418,18 @@ bool PlanRunner::loadAddCartResult()
         return false;
     }
 
+    // 第一个开启调试
+    m_buyParams[0].m_enableDebug = true;
+
     return true;
+}
+
+void PlanRunner::enterMonitorProcess()
+{
+    PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_QUERY);
+    emit planStatusChange(m_planId);
+    launchGoodsChecker();
+    launchSessionUpdater();
 }
 
 void PlanRunner::launchGoodsChecker()
@@ -543,6 +551,7 @@ bool PlanRunner::launchGoodsBuyer()
 
         GoodsBuyer* buyer = new GoodsBuyer();
         buyer->setParams(buyParams);
+        buyer->setPlanDataPath(m_planDataPath);
         connect(buyer, &GoodsBuyer::buyFinish, this, &PlanRunner::onGoodsBuyFinish);
         connect(buyer, &GoodsBuyer::printLog, this, &PlanRunner::printLog);
         connect(buyer, &GoodsBuyer::finished, buyer, &QObject::deleteLater);
@@ -677,8 +686,6 @@ bool PlanRunner::saveBuyingResult(const QVector<BuyResult>& buyResults)
     QString log = QString::fromWCharArray(L"购买结果保存到：%1").arg(qdestExcelFilePath);
     printLog(log);
 
-    QDesktopServices::openUrl(QUrl::fromLocalFile(m_planDataPath));
-
     return true;
 }
 
@@ -715,7 +722,25 @@ bool PlanRunner::deleteSuccessUsers(const QVector<BuyResult>& buyResults)
 
 void PlanRunner::finishPlan()
 {    
-    saveBuyingResult(m_buyResults);
-    deleteSuccessUsers(m_buyResults);
-    emit runFinish(m_planId, true);
+    bool hasSuccess = false;
+    for (auto& buyResult : m_buyResults)
+    {
+        if (buyResult.m_success)
+        {
+            hasSuccess = true;
+            break;
+        }
+    }
+
+    if (hasSuccess)
+    {
+        saveBuyingResult(m_buyResults);
+        deleteSuccessUsers(m_buyResults);
+        emit runFinish(m_planId, true);
+    }
+    else
+    {
+        printLog("没抢到，继续监控");
+        enterMonitorProcess();
+    }
 }
