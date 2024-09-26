@@ -228,6 +228,11 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     CURL* curl = nullptr;
     if (userData->m_buyResult.m_currentStep == STEP_SEARCH_SHOP)
     {
+        qInfo("[%s] select shop, id=%s, postal code=%s",
+              userData->m_buyResult.m_account.toStdString().c_str(),
+              userData->m_buyParam.m_buyingShop.m_storeNumber.toStdString().c_str(),
+              userData->m_buyParam.m_buyingShop.m_postalCode.toStdString().c_str());
+
         QString url = userData->m_buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/fulfillment?_a=search&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -264,11 +269,6 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     }
     else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
-        qInfo("[%s] select shop, id=%s, postal code=%s",
-              userData->m_buyResult.m_account.toStdString().c_str(),
-              userData->m_buyParam.m_buyingShop.m_storeNumber.toStdString().c_str(),
-              userData->m_buyParam.m_buyingShop.m_postalCode.toStdString().c_str());
-
         QString url = userData->m_buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
         headers["Content-Type"] = "application/x-www-form-urlencoded";

@@ -257,6 +257,8 @@ void GoodsAvailabilityChecker::parseQueryShopData(const QString& data, QVector<S
                 continue;
             }
 
+            qInfo("have goods at %s %s", storeNumber.toStdString().c_str(), postalCode.toStdString().c_str());
+
             for (auto& shop : m_shops)
             {
                 if (shop.m_postalCode == postalCode)
