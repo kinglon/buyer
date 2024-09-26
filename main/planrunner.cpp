@@ -552,6 +552,7 @@ bool PlanRunner::launchGoodsBuyer()
         GoodsBuyer* buyer = new GoodsBuyer();
         buyer->setParams(buyParams);
         buyer->setPlanDataPath(m_planDataPath);
+        buyer->setName(QString::fromWCharArray(L"购买线程%1").arg(i+1));
         connect(buyer, &GoodsBuyer::buyFinish, this, &PlanRunner::onGoodsBuyFinish);
         connect(buyer, &GoodsBuyer::printLog, this, &PlanRunner::printLog);
         connect(buyer, &GoodsBuyer::finished, buyer, &QObject::deleteLater);
@@ -740,7 +741,7 @@ void PlanRunner::finishPlan()
     }
     else
     {
-        printLog("没抢到，继续监控");
+        printLog(QString::fromWCharArray(L"没抢到，继续监控"));
         enterMonitorProcess();
     }
 }

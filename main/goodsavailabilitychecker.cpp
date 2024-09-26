@@ -131,6 +131,7 @@ QVector<ShopItem> GoodsAvailabilityChecker::queryIfGoodsAvailable()
             }
         }
 
+        // 显示报告数据
         int elapse = GetTickCount64() - lastReportLogTime;
         if (elapse >= 10000)
         {

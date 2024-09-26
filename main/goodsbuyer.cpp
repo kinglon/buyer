@@ -13,8 +13,21 @@
 #include <QTextStream>
 #include "settingmanager.h"
 #include "proxymanager.h"
+#include "jsonutil.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
+
+// 重试请求间隔，2秒
+#define RETRY_REQUEST_INTERVAL  2000
+
+// 搜索店铺最大重试次数
+#define MAX_SEARCH_SHOP_RETRY_COUNT  60
+
+// 处理中最大重试次数
+#define MAX_PROCESS_RETRY_COUNT  30
+
+// 查询订单号最大重试次数
+#define MAX_QUERY_ORDER_RETRY_COUNT  3
 
 GoodsBuyer::GoodsBuyer(QObject *parent)
     : HttpThread{parent}
@@ -33,18 +46,13 @@ void GoodsBuyer::run()
 
     // 初始化每个购买流程
     int64_t beginTime = GetTickCount64();
+    QVector<BuyUserData*> buyUserDatas;
     for (int i=0; i<m_buyParams.size(); i++)
     {
         BuyUserData* userData = new BuyUserData();
+        buyUserDatas.append(userData);
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
-        if (SettingManager::getInstance()->m_enableSelectFulfillmentDatetime)
-        {
-            userData->m_buyResult.m_currentStep = STEP_QUERY_DATETIME;
-        }
-        else
-        {
-            userData->m_buyResult.m_currentStep = STEP_SELECT_SHOP;
-        }
+        userData->m_buyResult.m_currentStep = STEP_SEARCH_SHOP;
         userData->m_buyResult.m_localIp = m_buyParams[i].m_localIp;
         userData->m_buyParam = m_buyParams[i];
         QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
@@ -65,8 +73,28 @@ void GoodsBuyer::run()
         curl_multi_add_handle(m_multiHandle, curl);
     }
 
+    int64_t lastReportLogTime = GetTickCount64();
+
     while (!m_requestStop)
     {        
+        // 发送需要重传的请求
+        qint64 now = GetTickCount64();
+        while (!m_retryRequests.empty())
+        {
+            BuyUserData* userData = m_retryRequests.front();
+            if (now - userData->m_lastRequestTime >= RETRY_REQUEST_INTERVAL)
+            {
+                m_retryRequests.pop_front();
+                CURL* curl = makeBuyingRequest(userData);
+                if (curl)
+                {
+                    curl_multi_add_handle(m_multiHandle, curl);
+                }
+                continue;
+            }
+            break;
+        }
+
         int numfds = 0;
         curl_multi_wait(m_multiHandle, NULL, 0, 100, &numfds);
 
@@ -102,7 +130,6 @@ void GoodsBuyer::run()
                         .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
                 emit printLog(log);
                 m_buyResults.append(userData->m_buyResult);
-                delete userData;
             }
         }
 
@@ -112,6 +139,27 @@ void GoodsBuyer::run()
         if (m_buyResults.size() == m_buyParams.size())
         {
             break;
+        }
+
+        // 显示报告数据
+        int elapse = GetTickCount64() - lastReportLogTime;
+        if (elapse >= 10000)
+        {
+            QString stepRequestCountString;
+            for (auto it=m_stepRequestCounts.begin(); it!=m_stepRequestCounts.end(); it++)
+            {
+                stepRequestCountString += ", step" + QString::number(it.key()) + "=" + QString::number(it.value());
+            }
+            QString logContent = QString::fromWCharArray(L"%1, 购买数=%2, 时长=%3")
+                    .arg(m_name, QString::number(buyUserDatas.size()), QString::number(elapse));
+            logContent += stepRequestCountString;
+            emit printLog(logContent);
+
+            lastReportLogTime = GetTickCount64();
+            for (auto it=m_stepRequestCounts.begin(); it!=m_stepRequestCounts.end(); it++)
+            {
+                it.value() = 0;
+            }
         }
     }
 
@@ -126,7 +174,6 @@ void GoodsBuyer::run()
             if (userData)
             {
                 m_buyResults.append(userData->m_buyResult);
-                delete userData;
             }
             curl_multi_remove_handle(m_multiHandle, list[i]);
             freeRequest(list[i]);
@@ -134,6 +181,13 @@ void GoodsBuyer::run()
         curl_free(list);
     }
     curl_multi_cleanup(m_multiHandle);
+
+    // 释放userdata
+    for (auto& userData : buyUserDatas)
+    {
+        delete userData;
+    }
+    buyUserDatas.clear();
 
     emit buyFinish(this, new QVector<BuyResult>(m_buyResults));
 }
@@ -172,7 +226,25 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     headers["Modelversion"] = "v2";
 
     CURL* curl = nullptr;
-    if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
+    if (userData->m_buyResult.m_currentStep == STEP_SEARCH_SHOP)
+    {
+        QString url = userData->m_buyParam.m_appStoreHost
+                + QString("/shop/checkoutx/fulfillment?_a=search&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Requested-With"] = "Fetch";
+        headers["X-Aos-Model-Page"] = "checkoutPage";
+        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+                + "/shop/checkout?_s=Fulfillment-init";
+        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+        if (curl)
+        {
+            QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=%1&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
+                    .arg(userData->m_buyParam.m_buyingShop.m_storeNumber, userData->m_buyParam.m_buyingShop.m_postalCode);
+            setPostMethod(curl, body);
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
         QString url = userData->m_buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
@@ -308,6 +380,9 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyParam.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
 
+    userData->m_lastRequestTime = GetTickCount64();
+    m_stepRequestCounts[userData->m_buyResult.m_currentStep] += 1;
+
     qInfo("[%s] begin to send request %d", userData->m_buyResult.m_account.toStdString().c_str(),
           userData->m_buyResult.m_currentStep);
 
@@ -347,7 +422,6 @@ void GoodsBuyer::handleResponse(CURL* curl)
                 .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
         emit printLog(log);
         m_buyResults.append(userData->m_buyResult);
-        delete userData;
         return;
     }
 
@@ -365,8 +439,51 @@ void GoodsBuyer::handleResponse(CURL* curl)
         }
     }
 
-    bool canNextStep = true;
-    if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
+    if (userData->m_buyResult.m_currentStep == STEP_SEARCH_SHOP)
+    {
+        if (userData->m_buyParam.m_enableDebug)
+        {
+            saveDataToFile(responseData, "STEP_SEARCH_SHOP.txt");
+        }
+
+        bool hasPhone = false;
+        bool hasRecommend = false;
+        if (!getGoodsAvalibility(userData, responseData, hasPhone, hasRecommend))
+        {
+            // 返回数据有问题，就让它走下去
+            enterStep(userData, STEP_SELECT_SHOP);
+        }
+        else
+        {
+            if (userData->m_buyParam.m_enableDebug)
+            {
+                QString log = getGoodsAvailabilityString(hasPhone, hasRecommend);
+                emit printLog(log);
+            }
+
+            if (hasPhone)
+            {
+                // 有手机就让它走下去
+                enterStep(userData, STEP_SELECT_SHOP);
+            }
+            else
+            {
+                if (userData->m_retryCount < MAX_SEARCH_SHOP_RETRY_COUNT)
+                {
+                    retryRequest(userData);
+                }
+                else
+                {
+                    userData->m_buyResult.m_failReason = QString::fromWCharArray(L"手机无货");
+                    QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                            .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+                    emit printLog(log);
+                    m_buyResults.append(userData->m_buyResult);
+                }
+            }
+        }
+    }
+    else if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
     {
         if (userData->m_buyParam.m_enableDebug)
         {
@@ -391,7 +508,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
               checkInStart.toStdString().c_str(),
               checkInEnd.toStdString().c_str());
 
-        userData->m_buyResult.m_currentStep = STEP_SELECT_SHOP;
+        enterStep(userData, STEP_SELECT_SHOP);
     }
     else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
@@ -400,7 +517,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
             saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
         }
 
-        userData->m_buyResult.m_currentStep = STEP_REVIEW;
+        enterStep(userData, STEP_REVIEW);
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
@@ -412,7 +529,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
         qint64 totalTime = GetTickCount64() - userData->m_buyParam.m_beginBuyTime;
         QString takeTime = QString::fromWCharArray(L"总%1").arg(totalTime);
         userData->m_buyResult.m_takeTimes.append(takeTime);
-        userData->m_buyResult.m_currentStep = STEP_PROCESS;
+        enterStep(userData, STEP_PROCESS);
     }
     else if (userData->m_buyResult.m_currentStep == STEP_PROCESS)
     {
@@ -423,44 +540,48 @@ void GoodsBuyer::handleResponse(CURL* curl)
 
         if (!handleProcessResponse(userData, responseData))
         {
-            userData->m_buyResult.m_currentStep = STEP_PROCESS;
+            if (userData->m_retryCount < MAX_PROCESS_RETRY_COUNT)
+            {
+                retryRequest(userData);
+            }
+            else
+            {
+                userData->m_buyResult.m_failReason = QString::fromWCharArray(L"等待处理超时");
+                QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                        .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+                emit printLog(log);
+                m_buyResults.append(userData->m_buyResult);
+            }
         }
         else
         {
             if (userData->m_buyResult.m_success)
             {
-                userData->m_buyResult.m_currentStep = STEP_QUERY_ORDER_NO;
+                enterStep(userData, STEP_QUERY_ORDER_NO);
             }
             else
             {
-                canNextStep = false;
+                m_buyResults.append(userData->m_buyResult);
             }
         }
     }
     else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
     {
-        handleQueryOrderResponse(userData, responseData);
-        canNextStep = false;  // 不管有没有获取到订单号，都结束流程
-    }
-
-    // 开发调试使用
-    if (userData->m_buyResult.m_currentStep >= SettingManager::getInstance()->m_stopStep)
-    {
-        canNextStep = false;
-    }
-
-    if (canNextStep)
-    {
-        CURL* nextCurl = makeBuyingRequest(userData);
-        if (nextCurl)
+        if (handleQueryOrderResponse(userData, responseData))
         {
-            curl_multi_add_handle(m_multiHandle, nextCurl);
+            m_buyResults.append(userData->m_buyResult);
         }
-    }
-    else
-    {
-        m_buyResults.append(userData->m_buyResult);
-        delete userData;
+        else
+        {
+            if (userData->m_retryCount < MAX_QUERY_ORDER_RETRY_COUNT)
+            {
+                retryRequest(userData);
+            }
+            else
+            {
+                m_buyResults.append(userData->m_buyResult);
+            }
+        }
     }
 }
 
@@ -571,6 +692,63 @@ void GoodsBuyer::handleQueryDateTimeResponse(BuyUserData* userData, QString& res
     }
 }
 
+bool GoodsBuyer::getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend)
+{
+    QByteArray jsonData = responseData.toUtf8();
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        qCritical("failed to parse the search shop response data");
+        return false;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    QVector<QString> keys;
+    keys.append("body");
+    keys.append("checkout");
+    keys.append("fulfillment");
+    keys.append("pickupTab");
+    keys.append("pickup");
+    keys.append("storeLocator");
+    keys.append("searchResults");
+    keys.append("d");
+    QJsonObject dJson;
+    if (!JsonUtil::findObject(root, keys, dJson) || !dJson.contains("retailStores"))
+    {
+        qCritical("failed to find the retailStores node");
+        return false;
+    }
+
+    QJsonArray retailStoresJson = dJson["retailStores"].toArray();
+    for (auto retailStoreItem : retailStoresJson)
+    {
+        QJsonObject retailStoreJson = retailStoreItem.toObject();
+        QString storeId = retailStoreJson["storeId"].toString();
+        if (storeId == userData->m_buyParam.m_buyingShop.m_storeNumber)
+        {
+            hasPhone = false;
+            hasRecommend = false;
+            QJsonArray lineItemAvailabilityJson = retailStoreJson["availability"].toObject()["lineItemAvailability"].toArray();
+            for (auto lineItem : lineItemAvailabilityJson)
+            {
+                QJsonObject lineItemJson = lineItem.toObject();
+                if (lineItemJson["partName"].toString().indexOf("iPhone") >= 0)
+                {
+                    hasPhone = lineItemJson["availableNowForLine"].toBool();
+                }
+                else
+                {
+                    hasRecommend = lineItemJson["availableNowForLine"].toBool();
+                }
+            }
+            return true;
+        }
+    }
+
+    qCritical("failed to find the desired shop: %s", userData->m_buyParam.m_buyingShop.m_storeNumber.toStdString().c_str());
+    return false;
+}
+
 bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseData)
 {
     if (responseData.indexOf("thankyou") >= 0)
@@ -613,6 +791,21 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
                 .arg(userData->m_buyResult.m_account, title);
         emit printLog(log);
         return true;
+    }
+
+    // 判断是不是没货
+    bool hasPhone = false;
+    bool hasRecommend = false;
+    if (getGoodsAvalibility(userData, responseData, hasPhone, hasRecommend))
+    {
+        if (!hasPhone || !hasRecommend)
+        {
+            userData->m_buyResult.m_failReason = getGoodsAvailabilityString(hasPhone, hasRecommend);
+            QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                    .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+            emit printLog(log);
+            return true;
+        }
     }
 
     return false;
@@ -671,6 +864,46 @@ void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QS
     QString base64CipherText = QString::fromUtf8(base64ByteArray);
     cardNoCipher = QString("{\"cipherText\":\"%1\",\"publicKeyHash\":\"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=\"}")
             .arg(base64CipherText);
+}
+
+void GoodsBuyer::retryRequest(BuyUserData* userData)
+{
+    m_retryRequests.push_back(userData);
+    userData->m_retryCount += 1;
+}
+
+void GoodsBuyer::enterStep(BuyUserData* userData, int step)
+{
+    userData->m_buyResult.m_currentStep = step;
+    userData->m_retryCount = 0;
+    CURL* nextCurl = makeBuyingRequest(userData);
+    if (nextCurl)
+    {
+        curl_multi_add_handle(m_multiHandle, nextCurl);
+    }
+}
+
+QString GoodsBuyer::getGoodsAvailabilityString(bool hasPhone, bool hasRecommend)
+{
+    QString str;
+    if (hasPhone)
+    {
+        str += QString::fromWCharArray(L"手机有货");
+    }
+    else
+    {
+        str += QString::fromWCharArray(L"手机无货");
+    }
+
+    if (hasRecommend)
+    {
+        str += QString::fromWCharArray(L"，配件有货");
+    }
+    else
+    {
+        str += QString::fromWCharArray(L"，配件无货");
+    }
+    return str;
 }
 
 void GoodsBuyer::saveDataToFile(const QString& data, QString fileName)

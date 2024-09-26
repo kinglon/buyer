@@ -21,6 +21,7 @@ SOURCES += \
     goodsavailabilitychecker.cpp \
     goodsbuyer.cpp \
     httpthread.cpp \
+    jsonutil.cpp \
     localipmanager.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -49,6 +50,7 @@ HEADERS += \
     goodsavailabilitychecker.h \
     goodsbuyer.h \
     httpthread.h \
+    jsonutil.h \
     localipmanager.h \
     mainwindow.h \
     multiselectiondialog.h \
