@@ -74,6 +74,7 @@ void GoodsBuyer::run()
     }
 
     int64_t lastReportLogTime = GetTickCount64();
+    bool needCheckGoodsAvailability = true;
 
     while (!m_requestStop)
     {        
@@ -135,6 +136,32 @@ void GoodsBuyer::run()
 
         curl_multi_remove_handle(m_multiHandle, m->easy_handle);
         freeRequest(m->easy_handle);
+
+        // 检查是否每个号都是无货
+        if (needCheckGoodsAvailability)
+        {
+            bool allNotHave = true; // 所有号都没有货
+            for (auto& userData : buyUserDatas)
+            {
+                if (userData->m_phoneAvailStatus == GoodsAvailStatus::HAVE)
+                {
+                    needCheckGoodsAvailability = false;
+                    allNotHave = false;
+                    break;
+                }
+
+                if (userData->m_phoneAvailStatus == GoodsAvailStatus::UNKNOWN)
+                {
+                    allNotHave = false;
+                }
+            }
+
+            if (allNotHave)
+            {
+                emit printLog(QString::fromWCharArray(L"所有号都没手机"));
+                break;
+            }
+        }
 
         if (m_buyResults.size() == m_buyParams.size())
         {
@@ -463,11 +490,13 @@ void GoodsBuyer::handleResponse(CURL* curl)
 
             if (hasPhone)
             {
+                userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
                 // 有手机就让它走下去
                 enterStep(userData, STEP_SELECT_SHOP);
             }
             else
-            {
+            {                
+                userData->m_phoneAvailStatus = GoodsAvailStatus::NOT_HAVE;
                 if (userData->m_retryCount < MAX_SEARCH_SHOP_RETRY_COUNT)
                 {
                     retryRequest(userData);

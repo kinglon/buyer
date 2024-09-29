@@ -80,6 +80,14 @@ public:
     }
 };
 
+// 商品是否有货
+enum GoodsAvailStatus
+{
+    UNKNOWN = 1,
+    HAVE = 2,
+    NOT_HAVE = 3
+};
+
 class BuyUserData
 {
 public:
@@ -91,6 +99,9 @@ public:
 
     // 步骤开始时间，GetTickCount64返回的秒数
     int64_t m_stepBeginTime = 0;
+
+    // 标志是否无货
+    int m_phoneAvailStatus = GoodsAvailStatus::UNKNOWN;
 
     // ssi
     QString m_ssi;
