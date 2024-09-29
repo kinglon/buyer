@@ -8,7 +8,7 @@
 #define APPLE_HOST "https://www.apple.com/jp"
 
 GoodsAvailabilityChecker::GoodsAvailabilityChecker(QObject *parent)
-    : HttpThread{parent}
+    : GoodsAvailabilityCheckerBase{parent}
 {
     m_queryShopPostalCodes.push_back("600-8006");
     m_queryShopPostalCodes.push_back("100-0005");
@@ -276,7 +276,7 @@ void GoodsAvailabilityChecker::run()
     if (m_shops.empty() || m_phoneCode.isEmpty())
     {
         qCritical("param is wrong");
-        emit checkFinish(nullptr);
+        emit checkFinish(this, nullptr);
         return;
     }
 
@@ -285,7 +285,7 @@ void GoodsAvailabilityChecker::run()
 
     // 查询是否有货
     QVector<ShopItem> shops = queryIfGoodsAvailable();
-    emit checkFinish(new QVector<ShopItem>(shops));
+    emit checkFinish(this, new QVector<ShopItem>(shops));
 }
 
 

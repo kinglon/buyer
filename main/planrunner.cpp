@@ -22,6 +22,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include "localipmanager.h"
+#include "goodsavailabilitychecker.h"
 
 using namespace QXlsx;
 
@@ -57,9 +58,10 @@ bool PlanRunner::start()
 void PlanRunner::stop()
 {
     m_requestStop = true;
-    if (m_goodsChecker)
+
+    for (auto& checker : m_goodsCheckers)
     {
-        m_goodsChecker->requestStop();
+        checker->requestStop();
     }
 
     if (m_sessionUpdater)
@@ -76,9 +78,9 @@ void PlanRunner::stop()
 
 void PlanRunner::mockHaveGoods()
 {
-    if (m_goodsChecker)
+    if (m_goodsCheckers.size() > 0)
     {
-        m_goodsChecker->mockFinish();
+        m_goodsCheckers[0]->mockFinish();
     }
 }
 
@@ -440,28 +442,33 @@ void PlanRunner::launchGoodsChecker()
         return;
     }
 
-    m_goodsChecker = new GoodsAvailabilityChecker();
-    m_goodsChecker->setPhoneCode(plan->m_phoneCode);
+    // 使用首页接口监控
+    GoodsAvailabilityChecker* goodsChecker = new GoodsAvailabilityChecker();
+    goodsChecker->setPhoneCode(plan->m_phoneCode);
+    m_goodsCheckers.append(goodsChecker);
 
-    QVector<ShopItem> queryShops;
-    for (const auto& shopName : plan->m_buyingShops)
+    for (auto& goodsChecker : m_goodsCheckers)
     {
-        for (const auto& shop : SettingManager::getInstance()->m_shops)
+        QVector<ShopItem> queryShops;
+        for (const auto& shopName : plan->m_buyingShops)
         {
-            if (shop.m_name == shopName)
+            for (const auto& shop : SettingManager::getInstance()->m_shops)
             {
-                queryShops.append(shop);
-                break;
+                if (shop.m_name == shopName)
+                {
+                    queryShops.append(shop);
+                    break;
+                }
             }
         }
-    }
-    m_goodsChecker->setShops(queryShops);
-    m_goodsChecker->setLocalIps(LocalIpManager::getInstance()->getAllIps());
+        goodsChecker->setShops(queryShops);
+        goodsChecker->setLocalIps(LocalIpManager::getInstance()->getAllIps());
 
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
-    connect(m_goodsChecker, &GoodsAvailabilityChecker::finished, m_goodsChecker, &QObject::deleteLater);
-    m_goodsChecker->start();
+        connect(goodsChecker, &GoodsAvailabilityChecker::checkFinish, this, &PlanRunner::onGoodsCheckFinish);
+        connect(goodsChecker, &GoodsAvailabilityChecker::printLog, this, &PlanRunner::printLog);
+        connect(goodsChecker, &GoodsAvailabilityChecker::finished, goodsChecker, &QObject::deleteLater);
+        goodsChecker->start();
+    }
 }
 
 void PlanRunner::launchSessionUpdater()
@@ -474,7 +481,7 @@ void PlanRunner::launchSessionUpdater()
     m_sessionUpdater->start();
 }
 
-void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
+void PlanRunner::onGoodsCheckFinish(GoodsAvailabilityCheckerBase* checker, QVector<ShopItem>* shops)
 {
     if (m_sessionUpdater)
     {
@@ -482,7 +489,16 @@ void PlanRunner::onGoodsCheckFinish(QVector<ShopItem>* shops)
         m_sessionUpdater->requestStop();
         m_sessionUpdater = nullptr;
     }
-    m_goodsChecker = nullptr;
+
+    for (auto& goodsChecker : m_goodsCheckers)
+    {
+        if (goodsChecker != checker)
+        {
+           goodsChecker->requestStop();
+        }
+    }
+    m_goodsCheckers.clear();
+
     if (m_requestStop)
     {
         delete shops;

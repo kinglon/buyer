@@ -19,6 +19,8 @@ SOURCES += \
     debugdialog.cpp \
     fixtimebuyer.cpp \
     goodsavailabilitychecker.cpp \
+    goodsavailabilitycheckerbase.cpp \
+    goodsavailabilitycheckermap.cpp \
     goodsbuyer.cpp \
     httpthread.cpp \
     jsonutil.cpp \
@@ -48,6 +50,8 @@ HEADERS += \
     debugdialog.h \
     fixtimebuyer.h \
     goodsavailabilitychecker.h \
+    goodsavailabilitycheckerbase.h \
+    goodsavailabilitycheckermap.h \
     goodsbuyer.h \
     httpthread.h \
     jsonutil.h \

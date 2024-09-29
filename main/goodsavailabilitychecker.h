@@ -3,10 +3,10 @@
 
 #include <QThread>
 #include <QObject>
-#include "httpthread.h"
-#include "datamodel.h"
+#include "goodsavailabilitycheckerbase.h"
 
-class GoodsAvailabilityChecker : public HttpThread
+// 采用首页接口进行监控
+class GoodsAvailabilityChecker : public GoodsAvailabilityCheckerBase
 {
     Q_OBJECT
 
@@ -14,20 +14,8 @@ public:
     explicit GoodsAvailabilityChecker(QObject *parent = nullptr);
 
 public:
-    // 请求退出
-    void requestStop() { m_requestStop = true; }
-
-    // 模拟有货
-    void mockFinish() { m_mockFinish = true; }
-
-    // 设置查询店铺列表
-    void setShops(const QVector<ShopItem>& shops) { m_shops = shops; }
-
     // 设置查询机型码
     void setPhoneCode(QString phoneCode) { m_phoneCode = phoneCode; }
-
-    // 设置本地IP列表
-    void setLocalIps(const QVector<QString>& localIps) { m_localIps = localIps; }
 
 protected:
     void run() override;
@@ -44,17 +32,7 @@ private:
 
     void parseQueryShopData(const QString& data, QVector<ShopItem>& shops);
 
-signals:
-    // 有货的店铺
-    void checkFinish(QVector<ShopItem>* shops);
-
-    void printLog(QString content);
-
 private:
-    bool m_requestStop = false;
-
-    bool m_mockFinish = false;
-
     // 最大请求数
     int m_maxReqCount = 30;
 
@@ -65,19 +43,10 @@ private:
     int m_reqIntervalMs = 100;
 
     // 上一次请求发送的时间，GetTickCount64()返回的时间
-    int64_t m_lastSendReqTimeMs = 0;
-
-    // 查询店铺列表
-    QVector<ShopItem> m_shops;
+    int64_t m_lastSendReqTimeMs = 0;    
 
     // 查询机型码
-    QString m_phoneCode;
-
-    // 本地IP列表
-    QVector<QString> m_localIps;
-
-    // 轮询使用本地IP，标识下一个使用的IP索引
-    int m_nextLocalIpIndex = 0;
+    QString m_phoneCode;    
 
     // 店铺查询次数，用于统计
     QMap<QString, int> m_shopQueryCount;

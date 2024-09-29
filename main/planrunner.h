@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QVector>
 #include "datamodel.h"
-#include "goodsavailabilitychecker.h"
+#include "goodsavailabilitycheckerbase.h"
 #include "goodsbuyer.h"
 #include "sessionupdater.h"
 
@@ -75,7 +75,7 @@ private slots:
     void printLog(const QString& content);
 
     // 有货
-    void onGoodsCheckFinish(QVector<ShopItem>* shops);
+    void onGoodsCheckFinish(GoodsAvailabilityCheckerBase* checker, QVector<ShopItem>* shops);
 
     // 购买完成
     void onGoodsBuyFinish(GoodsBuyer* buyer, QVector<BuyResult>* buyResults);
@@ -92,11 +92,11 @@ private:
 
     bool m_requestStop = false;
 
-    GoodsAvailabilityChecker* m_goodsChecker = nullptr;
+    QVector<GoodsAvailabilityCheckerBase*> m_goodsCheckers;
 
     SessionUpdater* m_sessionUpdater = nullptr;
 
-    QVector<GoodsBuyer*> m_goodsBuyers;    
+    QVector<GoodsBuyer*> m_goodsBuyers;
 
     // 购买参数列表
     QVector<BuyParam> m_buyParams;
