@@ -17,12 +17,6 @@ SessionUpdater::SessionUpdater(QObject *parent)
 
 }
 
-QVector<BuyParam>& SessionUpdater::getBuyParams()
-{
-    m_mutex.lock();
-    return m_buyParams;
-    m_mutex.unlock();
-}
 
 void SessionUpdater::run()
 {
@@ -48,16 +42,15 @@ void SessionUpdater::run()
         }
         beginTime = now;
 
-        m_mutex.lock();
         userDatas.clear();
-        for (int i=0; i<m_buyParams.size(); i++)
+        QVector<BuyParam> buyParams = m_buyParamManager->getBuyParams();
+        for (int i=0; i<buyParams.size(); i++)
         {
             SessionUserData userData;
-            userData.m_buyParam = m_buyParams[i];
+            userData.m_account = buyParams[i].m_user.m_accountName;
             userData.m_step = STEP_CHECK_EXPIRED;
             userDatas.append(userData);
         }
-        m_mutex.unlock();
 
         for (int i=0; i<userDatas.size(); i++)
         {
@@ -159,28 +152,30 @@ CURL* SessionUpdater::makeSessionUpdateRequest(SessionUserData* userData)
 
     QMap<QString, QString> headers;
     headers["origin"] = "https://www.apple.com/jp";
-    headers["Referer"] = "https://www.apple.com/jp";    
+    headers["Referer"] = "https://www.apple.com/jp";
+
+    BuyParam buyParam = m_buyParamManager->getBuyParam(userData->m_account);
 
     CURL* curl = nullptr;
     if (userData->m_step == STEP_CHECK_EXPIRED)
     {
         QString url = "https://www.apple.com/jp/shop/checkout";
         headers["Referer"] = "https://www.apple.com";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+        curl = makeRequest(url, headers, buyParam.m_cookies, proxyServer);
     }
     else if (userData->m_step == STEP_EXTEND_SESSION)
     {
-        QString url = userData->m_buyParam.m_appStoreHost
+        QString url = buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/session?_a=extendSession&_m=checkout.session");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["Syntax"] = "graviton";
         headers["Modelversion"] = "v2";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
+        headers["X-Aos-Stk"] = buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
         headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
+        headers["Referer"] = buyParam.m_appStoreHost
                 + "/shop/checkout?_s=Fulfillment";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
+        curl = makeRequest(url, headers, buyParam.m_cookies, proxyServer);
         if (curl)
         {
             setPostMethod(curl, "");
@@ -193,7 +188,7 @@ CURL* SessionUpdater::makeSessionUpdateRequest(SessionUserData* userData)
         return nullptr;
     }
 
-    curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_buyParam.m_localIp.toStdString().c_str());
+    curl_easy_setopt(curl, CURLOPT_INTERFACE, buyParam.m_localIp.toStdString().c_str());
     curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
 
     return curl;
@@ -222,28 +217,7 @@ void SessionUpdater::handleResponse(CURL* curl)
 
     // 更新cookies
     QMap<QString, QString> cookies = getCookies(curl);
-    for (auto it=cookies.begin(); it!=cookies.end(); it++)
-    {
-        if (it.value() == "DELETED")
-        {
-            userData->m_buyParam.m_cookies.remove(it.key());
-        }
-        else
-        {
-            userData->m_buyParam.m_cookies[it.key()] = it.value();
-        }
-    }
-
-    m_mutex.lock();
-    for (auto& buyParam : m_buyParams)
-    {
-        if (buyParam.m_user.m_accountName == userData->m_buyParam.m_user.m_accountName)
-        {
-            buyParam.m_cookies = userData->m_buyParam.m_cookies;
-            break;
-        }
-    }
-    m_mutex.unlock();
+    m_buyParamManager->updateCookies(userData->m_account, cookies);
 
     if (userData->m_step == STEP_CHECK_EXPIRED)
     {
@@ -303,7 +277,7 @@ void SessionUpdater::retry(CURL* curl)
 
     if (userData->m_retry < MAX_RETRY_COUNT)
     {
-        qInfo("retry to update session, ip is %s", userData->m_buyParam.m_localIp.toStdString().c_str());
+        qInfo("retry to update session, account is %s", userData->m_account.toStdString().c_str());
         userData->m_retry += 1;
         CURL* nextCurl = makeSessionUpdateRequest(userData);
         if (nextCurl)

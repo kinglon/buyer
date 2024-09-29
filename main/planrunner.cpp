@@ -28,7 +28,8 @@ using namespace QXlsx;
 
 PlanRunner::PlanRunner(QString planId, QObject *parent)
     : QObject{parent},
-      m_planId(planId)
+      m_planId(planId),
+      m_buyParamManager(new BuyParamManager())
 {
 
 }
@@ -383,6 +384,7 @@ bool PlanRunner::loadAddCartResult()
         return false;
     }
 
+    QVector<BuyParam> buyParams;
     int nextIpIndex = 0;
     QJsonObject root = jsonDocument.object();
     for (auto buyParamJson : root["buy_param"].toArray())
@@ -411,17 +413,20 @@ bool PlanRunner::loadAddCartResult()
         buyParam.m_localIp = m_localIps[nextIpIndex];
         nextIpIndex = (nextIpIndex+1) % m_localIps.size();
 
-        m_buyParams.append(buyParam);
+        buyParams.append(buyParam);
     }
 
-    if (m_buyParams.size() == 0)
+    if (buyParams.size() == 0)
     {
         printLog(QString::fromWCharArray(L"上号成功个数为0"));
         return false;
     }
 
     // 第一个开启调试
-    m_buyParams[0].m_enableDebug = true;
+    buyParams[0].m_enableDebug = true;
+
+
+    m_buyParamManager->setBuyParams(buyParams);
 
     return true;
 }
@@ -474,7 +479,7 @@ void PlanRunner::launchGoodsChecker()
 void PlanRunner::launchSessionUpdater()
 {
     m_sessionUpdater = new SessionUpdater();
-    m_sessionUpdater->setParams(m_buyParams);
+    m_sessionUpdater->setBuyParamManager(m_buyParamManager);
     connect(m_sessionUpdater, &SessionUpdater::sessionExpired, this, &PlanRunner::onSessionExpired);
     connect(m_sessionUpdater, &SessionUpdater::printLog, this, &PlanRunner::printLog);
     connect(m_sessionUpdater, &SessionUpdater::finished, m_sessionUpdater, &QObject::deleteLater);
@@ -484,8 +489,7 @@ void PlanRunner::launchSessionUpdater()
 void PlanRunner::onGoodsCheckFinish(GoodsAvailabilityCheckerBase* checker, QVector<ShopItem>* shops)
 {
     if (m_sessionUpdater)
-    {
-        m_buyParams = m_sessionUpdater->getBuyParams();
+    {        
         m_sessionUpdater->requestStop();
         m_sessionUpdater = nullptr;
     }
@@ -512,10 +516,7 @@ void PlanRunner::onGoodsCheckFinish(GoodsAvailabilityCheckerBase* checker, QVect
         PlanManager::getInstance()->setPlanStatus(m_planId, PLAN_STATUS_BUYING);
         emit planStatusChange(m_planId);
 
-        for (int i=0; i<m_buyParams.size(); i++)
-        {
-            m_buyParams[i].m_buyingShop = (*shops)[i%(*shops).size()];
-        }
+        m_buyParamManager->updateShops(*shops);
 
         if (!launchGoodsBuyer())
         {
@@ -541,7 +542,8 @@ bool PlanRunner::launchGoodsBuyer()
     }
 
     m_goodsBuyers.clear();
-    int totalBuyCount = m_buyParams.size();
+    QVector<BuyParam> allBuyParams = m_buyParamManager->getBuyParams();
+    int totalBuyCount = allBuyParams.size();
     int countPerThread = totalBuyCount / plan->m_threadCount;
     for (int i=0; i<plan->m_threadCount; i++)
     {        
@@ -561,8 +563,8 @@ bool PlanRunner::launchGoodsBuyer()
         for (int j=0; j<realCount; j++)
         {
             int index = i*countPerThread+j;
-            m_buyParams[index].m_beginBuyTime = now;
-            buyParams.push_back(m_buyParams[index]);
+            allBuyParams[index].m_beginBuyTime = now;
+            buyParams.push_back(allBuyParams[index]);
         }
 
         GoodsBuyer* buyer = new GoodsBuyer();

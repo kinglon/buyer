@@ -6,8 +6,10 @@
 #include <QDateTime>
 #include <QMutex>
 #include <QJsonObject>
+#include <QSharedPointer>
 #include "httpthread.h"
 #include "datamodel.h"
+#include "buyparammanager.h"
 
 // 步骤
 #define STEP_CHECK_EXPIRED  1   // 检测是否过期
@@ -16,8 +18,8 @@
 class SessionUserData
 {
 public:
-    // 输入参数
-    BuyParam m_buyParam;
+    // 账号
+    QString m_account;
 
     // 步骤
     int m_step = STEP_CHECK_EXPIRED;
@@ -40,9 +42,7 @@ public:
 public:
     void requestStop() { m_requestStop = true; }
 
-    void setParams(const QVector<BuyParam>& params) { m_buyParams = params; }
-
-    QVector<BuyParam>& getBuyParams();
+    void setBuyParamManager(QSharedPointer<BuyParamManager> manager) { m_buyParamManager = manager; }
 
 protected:
     void run() override;
@@ -62,13 +62,11 @@ private:
     void retry(CURL* curl);
 
 private:
-    QMutex m_mutex;
-
     bool m_requestStop = false;
 
     CURLM* m_multiHandle = nullptr;
 
-    QVector<BuyParam> m_buyParams;
+    QSharedPointer<BuyParamManager> m_buyParamManager;
 };
 
 #endif // SESSIONUPDATER_H

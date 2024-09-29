@@ -4,10 +4,12 @@
 #include <Windows.h>
 #include <QObject>
 #include <QVector>
+#include <QSharedPointer>
 #include "datamodel.h"
 #include "goodsavailabilitycheckerbase.h"
 #include "goodsbuyer.h"
 #include "sessionupdater.h"
+#include "buyparammanager.h"
 
 class PlanRunner : public QObject
 {
@@ -98,8 +100,8 @@ private:
 
     QVector<GoodsBuyer*> m_goodsBuyers;
 
-    // 购买参数列表
-    QVector<BuyParam> m_buyParams;
+    // 购买参数管理器
+    QSharedPointer<BuyParamManager> m_buyParamManager;
 
     // 购买结果列表
     QVector<BuyResult> m_buyResults;

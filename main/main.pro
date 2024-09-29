@@ -15,6 +15,7 @@ SOURCES += \
     Utility/ImPath.cpp \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
+    buyparammanager.cpp \
     datamodel.cpp \
     debugdialog.cpp \
     fixtimebuyer.cpp \
@@ -46,6 +47,7 @@ HEADERS += \
     Utility/LogBuffer.h \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
+    buyparammanager.h \
     datamodel.h \
     debugdialog.h \
     fixtimebuyer.h \
