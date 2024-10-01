@@ -23,6 +23,7 @@
 #include <QDir>
 #include "localipmanager.h"
 #include "goodsavailabilitychecker.h"
+#include "goodsavailabilitycheckermap.h"
 
 using namespace QXlsx;
 
@@ -447,9 +448,14 @@ void PlanRunner::launchGoodsChecker()
         return;
     }
 
-    // 使用首页接口监控
-    GoodsAvailabilityChecker* goodsChecker = new GoodsAvailabilityChecker();
-    goodsChecker->setPhoneCode(plan->m_phoneCode);
+    // 使用首页接口监控 （先停掉）
+//    GoodsAvailabilityChecker* goodsChecker = new GoodsAvailabilityChecker();
+//    goodsChecker->setPhoneCode(plan->m_phoneCode);
+//    m_goodsCheckers.append(goodsChecker);
+
+    // 使用地图页接口监控
+    GoodsAvailabilityCheckerMap* goodsChecker = new GoodsAvailabilityCheckerMap();
+    goodsChecker->setBuyParamManager(m_buyParamManager);
     m_goodsCheckers.append(goodsChecker);
 
     for (auto& goodsChecker : m_goodsCheckers)

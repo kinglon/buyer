@@ -14,6 +14,7 @@
 #include "settingmanager.h"
 #include "proxymanager.h"
 #include "jsonutil.h"
+#include "appledataparser.h"
 
 #define APPLE_HOST "https://www.apple.com/jp"
 
@@ -52,7 +53,7 @@ void GoodsBuyer::run()
         BuyUserData* userData = new BuyUserData();
         buyUserDatas.append(userData);
         userData->m_buyResult.m_account = m_buyParams[i].m_user.m_accountName;
-        userData->m_buyResult.m_currentStep = STEP_SEARCH_SHOP;
+        userData->m_buyResult.m_currentStep = STEP_SELECT_SHOP;
         userData->m_buyResult.m_localIp = m_buyParams[i].m_localIp;
         userData->m_buyParam = m_buyParams[i];
         QString takeTime = QString::fromWCharArray(L"初始化%1").arg(beginTime-userData->m_buyParam.m_beginBuyTime);
@@ -253,7 +254,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
     headers["Modelversion"] = "v2";
 
     CURL* curl = nullptr;
-    if (userData->m_buyResult.m_currentStep == STEP_SEARCH_SHOP)
+    if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
         qInfo("[%s] select shop, id=%s, postal code=%s",
               userData->m_buyResult.m_account.toStdString().c_str(),
@@ -261,7 +262,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
               userData->m_buyParam.m_buyingShop.m_postalCode.toStdString().c_str());
 
         QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx/fulfillment?_a=search&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
+                + QString("/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
         headers["X-Requested-With"] = "Fetch";
@@ -294,7 +295,7 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
             setPostMethod(curl, body);
         }
     }
-    else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
+    else if (userData->m_buyResult.m_currentStep == STEP_SUBMIT_SHOP)
     {
         QString url = userData->m_buyParam.m_appStoreHost
                 + QString("/shop/checkoutx/fulfillment?_a=continueFromFulfillmentToPickupContact&_m=checkout.fulfillment");
@@ -466,33 +467,37 @@ void GoodsBuyer::handleResponse(CURL* curl)
         }
     }
 
-    if (userData->m_buyResult.m_currentStep == STEP_SEARCH_SHOP)
+    if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
         if (userData->m_buyParam.m_enableDebug)
         {
             saveDataToFile(responseData, "STEP_SEARCH_SHOP.txt");
         }
 
-        bool hasPhone = false;
-        bool hasRecommend = false;
-        if (!getGoodsAvalibility(userData, responseData, hasPhone, hasRecommend))
+        bool pickup = false;
+        if (!AppleDataParser::checkIfPickup(responseData, pickup))
         {
-            // 返回数据有问题，就让它走下去
-            enterStep(userData, STEP_SELECT_SHOP);
+            retryRequest(userData);
         }
         else
         {
             if (userData->m_buyParam.m_enableDebug)
             {
-                QString log = getGoodsAvailabilityString(hasPhone, hasRecommend);
-                emit printLog(log);
+                if (pickup)
+                {
+                    emit printLog(QString::fromWCharArray(L"可自提"));
+                }
+                else
+                {
+                    emit printLog(QString::fromWCharArray(L"不可自提"));
+                }
             }
 
-            if (hasPhone)
+            if (pickup)
             {
                 userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
                 // 有手机就让它走下去
-                enterStep(userData, STEP_SELECT_SHOP);
+                enterStep(userData, STEP_SUBMIT_SHOP);
             }
             else
             {                
@@ -503,7 +508,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
                 }
                 else
                 {
-                    userData->m_buyResult.m_failReason = QString::fromWCharArray(L"手机无货");
+                    userData->m_buyResult.m_failReason = QString::fromWCharArray(L"不可自提");
                     QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
                             .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
                     emit printLog(log);
@@ -539,14 +544,34 @@ void GoodsBuyer::handleResponse(CURL* curl)
 
         enterStep(userData, STEP_SELECT_SHOP);
     }
-    else if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
+    else if (userData->m_buyResult.m_currentStep == STEP_SUBMIT_SHOP)
     {
         if (userData->m_buyParam.m_enableDebug)
         {
             saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
         }
 
-        enterStep(userData, STEP_REVIEW);
+        bool pickup = false;
+        if (!AppleDataParser::checkIfPickup(responseData, pickup))
+        {
+            qCritical("failed to check if pickup, continue to review step");
+            enterStep(userData, STEP_REVIEW);
+        }
+        else
+        {
+            if (pickup)
+            {
+                enterStep(userData, STEP_REVIEW);
+            }
+            else
+            {
+                userData->m_buyResult.m_failReason = QString::fromWCharArray(L"不可自提");
+                QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+                        .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
+                emit printLog(log);
+                m_buyResults.append(userData->m_buyResult);
+            }
+        }
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
@@ -829,7 +854,7 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     {
         if (!hasPhone || !hasRecommend)
         {
-            userData->m_buyResult.m_failReason = getGoodsAvailabilityString(hasPhone, hasRecommend);
+            userData->m_buyResult.m_failReason = AppleDataParser::getGoodsAvailabilityString(hasPhone, hasRecommend);
             QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
                     .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
             emit printLog(log);
@@ -910,29 +935,6 @@ void GoodsBuyer::enterStep(BuyUserData* userData, int step)
     {
         curl_multi_add_handle(m_multiHandle, nextCurl);
     }
-}
-
-QString GoodsBuyer::getGoodsAvailabilityString(bool hasPhone, bool hasRecommend)
-{
-    QString str;
-    if (hasPhone)
-    {
-        str += QString::fromWCharArray(L"手机有货");
-    }
-    else
-    {
-        str += QString::fromWCharArray(L"手机无货");
-    }
-
-    if (hasRecommend)
-    {
-        str += QString::fromWCharArray(L"，配件有货");
-    }
-    else
-    {
-        str += QString::fromWCharArray(L"，配件无货");
-    }
-    return str;
 }
 
 void GoodsBuyer::saveDataToFile(const QString& data, QString fileName)

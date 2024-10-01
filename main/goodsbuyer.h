@@ -10,9 +10,9 @@
 #include "datamodel.h"
 
 // 购买步骤
-#define STEP_SEARCH_SHOP        1   // 搜索店铺
+#define STEP_SELECT_SHOP        1   // 选择店铺
 #define STEP_QUERY_DATETIME     2   // 查询领取日期和时间
-#define STEP_SELECT_SHOP        3   // 重新选择店铺
+#define STEP_SUBMIT_SHOP        3   // 提交店铺
 #define STEP_REVIEW             4   // 确认订单
 #define STEP_PROCESS            5   // 处理订单
 #define STEP_QUERY_ORDER_NO     6   // 查询订单号
@@ -27,7 +27,7 @@ public:
     QString m_orderNo;
 
     // 步骤
-    int m_currentStep = STEP_SEARCH_SHOP;
+    int m_currentStep = STEP_SELECT_SHOP;
 
     // 每个步骤的耗时，毫秒数
     QVector<QString> m_takeTimes;
@@ -172,8 +172,6 @@ private:
 
     // 进入步骤
     void enterStep(BuyUserData* userData, int step);
-
-    QString getGoodsAvailabilityString(bool hasPhone, bool hasRecommend);
 
     // 将data保存在C盘指定的文件名下
     void saveDataToFile(const QString& data, QString fileName);

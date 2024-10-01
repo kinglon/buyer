@@ -13,6 +13,7 @@
 #include "settingmanager.h"
 #include "proxymanager.h"
 #include "localipmanager.h"
+#include "ippoolcontroller.h"
 #include "debugdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -33,6 +34,9 @@ MainWindow::MainWindow(QWidget *parent)
     {
         ProxyManager::getInstance()->start();
     }
+
+    LocalIpManager::getInstance()->init();
+    IpPoolController::getInstance()->setIps(LocalIpManager::getInstance()->getAllIps());
 }
 
 MainWindow::~MainWindow()

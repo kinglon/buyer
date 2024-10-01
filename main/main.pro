@@ -15,6 +15,7 @@ SOURCES += \
     Utility/ImPath.cpp \
     Utility/LogBuffer.cpp \
     Utility/LogUtil.cpp \
+    appledataparser.cpp \
     buyparammanager.cpp \
     datamodel.cpp \
     debugdialog.cpp \
@@ -24,6 +25,7 @@ SOURCES += \
     goodsavailabilitycheckermap.cpp \
     goodsbuyer.cpp \
     httpthread.cpp \
+    ippoolcontroller.cpp \
     jsonutil.cpp \
     localipmanager.cpp \
     main.cpp \
@@ -47,6 +49,7 @@ HEADERS += \
     Utility/LogBuffer.h \
     Utility/LogMacro.h \
     Utility/LogUtil.h \
+    appledataparser.h \
     buyparammanager.h \
     datamodel.h \
     debugdialog.h \
@@ -56,6 +59,7 @@ HEADERS += \
     goodsavailabilitycheckermap.h \
     goodsbuyer.h \
     httpthread.h \
+    ippoolcontroller.h \
     jsonutil.h \
     localipmanager.h \
     mainwindow.h \

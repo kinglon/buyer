@@ -4,13 +4,18 @@
 
 LocalIpManager::LocalIpManager()
 {
-    getLocalIps();
+
 }
 
 LocalIpManager* LocalIpManager::getInstance()
 {
     static LocalIpManager* instance = new LocalIpManager();
     return instance;
+}
+
+void LocalIpManager::init()
+{
+    getLocalIps();
 }
 
 QVector<QString> LocalIpManager::getAllIps()

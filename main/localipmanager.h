@@ -12,6 +12,8 @@ protected:
 public:
     static LocalIpManager* getInstance();
 
+    void init();
+
     // 获取所有IP地址
     QVector<QString> getAllIps();
 
