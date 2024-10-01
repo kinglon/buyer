@@ -61,7 +61,7 @@ public:
             shopQueryCountString += ", " + it.key() + "=" + QString::number(it.value());
         }
         qint64 elapse = GetTickCount64() - m_lastReportTime;
-        QString str = QString::fromWCharArray(L"%1, 时长=%2, 请求次数=%3, %4")
+        QString str = QString::fromWCharArray(L"%1, 时长=%2, 请求次数=%3%4")
                 .arg(goodsDetail, QString::number(elapse), QString::number(m_requestCount), shopQueryCountString);
         return str;
     }

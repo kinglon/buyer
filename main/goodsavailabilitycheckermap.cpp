@@ -11,8 +11,13 @@
 GoodsAvailabilityCheckerMap::GoodsAvailabilityCheckerMap(QObject *parent)
     : GoodsAvailabilityCheckerBase{parent}
 {
-    m_queryShopPostalCodes.push_back("600-8006");
+    m_queryShopPostalCodes.push_back("160-0022");
     m_queryShopPostalCodes.push_back("100-0005");
+    m_queryShopPostalCodes.push_back("600-8006");
+    m_queryShopPostalCodes.push_back("212-0013");
+    m_queryShopPostalCodes.push_back("542-0086");
+    m_queryShopPostalCodes.push_back("460-0008");
+    m_queryShopPostalCodes.push_back("810-0001");
 }
 
 QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
@@ -141,7 +146,7 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
         int elapse = GetTickCount64() - m_reportData.m_lastReportTime;
         if (elapse >= 10000)
         {
-            QString logContent = m_reportData.toString() + QString(", 处理中请求次数=%1").arg(m_reqCount);
+            QString logContent = m_reportData.toString() + QString::fromWCharArray(L", 处理中请求次数=%1").arg(m_reqCount);
             emit printLog(logContent);
             m_reportData.reset();
         }
@@ -191,7 +196,7 @@ CURL* GoodsAvailabilityCheckerMap::makeQueryRequest(MapCheckerUserData* userData
     {
         QString storePostalCode = m_queryShopPostalCodes[m_nextQueryPostalCodeIndex];
         m_nextQueryPostalCodeIndex = (m_nextQueryPostalCodeIndex+1)%m_queryShopPostalCodes.size();
-        QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
+        QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%1")
                 .arg(storePostalCode);
         setPostMethod(curl, body);
         curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_localIp.toStdString().c_str());
@@ -211,17 +216,17 @@ void GoodsAvailabilityCheckerMap::parseQueryData(const QString& data, QVector<Sh
 
     for (auto& goodsDetail : goodsDetails)
     {
-        if (goodsDetail.m_hasPhone && goodsDetail.m_hasRecommend)
+        for (auto& shop : m_shops)
         {
-            qInfo("%s has goods", goodsDetail.m_strStoreId.toStdString().c_str());
-            for (auto& shop : m_shops)
+            if (shop.m_storeNumber == goodsDetail.m_strStoreId)
             {
-                if (shop.m_storeNumber == goodsDetail.m_strStoreId)
+                m_reportData.m_shopQueryCount[shop.m_storeNumber] += 1;
+                if (goodsDetail.m_hasPhone && goodsDetail.m_hasRecommend)
                 {
+                    qInfo("%s has goods", goodsDetail.m_strStoreId.toStdString().c_str());
                     shops.append(shop);
-                    m_reportData.m_shopQueryCount[shop.m_storeNumber] += 1;
-                    break;
                 }
+                break;
             }
         }
 

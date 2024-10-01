@@ -159,7 +159,7 @@ void GoodsBuyer::run()
 
             if (allNotHave)
             {
-                emit printLog(QString::fromWCharArray(L"所有号都没手机"));
+                emit printLog(QString::fromWCharArray(L"%1, 所有号都没手机").arg(m_name));
                 break;
             }
         }
