@@ -154,15 +154,16 @@ private:
 
     void handleSelectShopResponse(BuyUserData* userData, QString& responseData);
 
-    // 获取手机配件是否有货
-    bool getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend);
+    void handleSubmitShopResponse(BuyUserData* userData, QString& responseData);
 
-    // 处理中，返回true表示已经处理完成，false表示需要继续查询
+    // 返回false表示处理中
     bool handleProcessResponse(BuyUserData* userData, QString& responseData);
 
+    // 返回false表示未查询到
     bool handleQueryOrderResponse(BuyUserData* userData, QString& responseData);
 
-    void getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QString& cardNoCipher);
+    // 获取手机配件是否有货
+    bool getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend);
 
     // 重发请求
     void retryRequest(BuyUserData* userData);
@@ -173,7 +174,7 @@ private:
     // 结束购买，有错误
     void finishBuyWithError(BuyUserData* userData, QString error);
 
-    // 将data保存在C盘指定的文件名下
+    // 将data保存在指定的文件名下
     void saveDataToFile(const QString& data, QString fileName);
 
 private:

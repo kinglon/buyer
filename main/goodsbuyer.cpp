@@ -21,14 +21,17 @@
 // 重试请求间隔，2秒
 #define RETRY_REQUEST_INTERVAL  2000
 
-// 搜索店铺最大重试次数
-#define MAX_SEARCH_SHOP_RETRY_COUNT  60
+// 选择店铺最大重试次数
+#define MAX_SELECT_SHOP_RETRY_COUNT  60
 
 // 处理中最大重试次数
 #define MAX_PROCESS_RETRY_COUNT  30
 
 // 查询订单号最大重试次数
 #define MAX_QUERY_ORDER_RETRY_COUNT  3
+
+// 服务器报错(如返回503)最大重试次数
+#define MAX_SERVER_ERROR_RETRY_COUNT 2
 
 GoodsBuyer::GoodsBuyer(QObject *parent)
     : HttpThread{parent}
@@ -402,12 +405,17 @@ void GoodsBuyer::handleResponse(CURL* curl)
 
     // 网络请求报错，流程结束
     if (!(statusCode >= 200 && statusCode < 400))
-    {
-        userData->m_buyResult.m_failReason = QString::fromWCharArray(L"服务器返回%1").arg(statusCode);
-        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
-        emit printLog(log);
-        m_buyResults.append(userData->m_buyResult);
+    {        
+        if (userData->m_retryCount < MAX_SERVER_ERROR_RETRY_COUNT)
+        {
+            retryRequest(userData);
+        }
+        else
+        {
+            QString error = QString::fromWCharArray(L"服务器返回%1").arg(statusCode);
+            finishBuyWithError(userData, error);
+        }
+
         return;
     }
 
@@ -431,32 +439,7 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }    
     else if (userData->m_buyResult.m_currentStep == STEP_SUBMIT_SHOP)
     {
-        if (userData->m_buyParam.m_enableDebug)
-        {
-            saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
-        }
-
-        bool pickup = false;
-        if (!AppleDataParser::checkIfPickup(responseData, pickup))
-        {
-            qCritical("failed to check if pickup, continue to review step");
-            enterStep(userData, STEP_REVIEW);
-        }
-        else
-        {
-            if (pickup)
-            {
-                enterStep(userData, STEP_REVIEW);
-            }
-            else
-            {
-                userData->m_buyResult.m_failReason = QString::fromWCharArray(L"不可自提");
-                QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                        .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
-                emit printLog(log);
-                m_buyResults.append(userData->m_buyResult);
-            }
-        }
+        handleSubmitShopResponse(userData, responseData);
     }
     else if (userData->m_buyResult.m_currentStep == STEP_REVIEW)
     {
@@ -485,33 +468,14 @@ void GoodsBuyer::handleResponse(CURL* curl)
             }
             else
             {
-                userData->m_buyResult.m_failReason = QString::fromWCharArray(L"等待处理超时");
-                QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                        .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
-                emit printLog(log);
-                m_buyResults.append(userData->m_buyResult);
-            }
-        }
-        else
-        {
-            if (userData->m_buyResult.m_success)
-            {
-                enterStep(userData, STEP_QUERY_ORDER_NO);
-            }
-            else
-            {
-                m_buyResults.append(userData->m_buyResult);
+                finishBuyWithError(userData, QString::fromWCharArray(L"等待处理超时"));
             }
         }
     }
     else if (userData->m_buyResult.m_currentStep == STEP_QUERY_ORDER_NO)
     {
-        if (handleQueryOrderResponse(userData, responseData))
-        {
-            m_buyResults.append(userData->m_buyResult);
-        }
-        else
-        {
+        if (!handleQueryOrderResponse(userData, responseData))
+        {            
             if (userData->m_retryCount < MAX_QUERY_ORDER_RETRY_COUNT)
             {
                 retryRequest(userData);
@@ -531,109 +495,161 @@ void GoodsBuyer::handleSelectShopResponse(BuyUserData* userData, QString& respon
         saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
     }
 
-    bool pickup = false;
-    if (!AppleDataParser::checkIfPickup(responseData, pickup))
+    // 检查是否有货
+    bool hasPhone = false;
+    bool hasRecommend = false;
+    if (!getGoodsAvalibility(userData, responseData, hasPhone, hasRecommend))
     {
-        retryRequest(userData);
-    }
-    else
-    {
-        if (userData->m_buyParam.m_enableDebug)
+        if (userData->m_retryCount < MAX_SELECT_SHOP_RETRY_COUNT)
         {
-            if (pickup)
-            {
-                emit printLog(QString::fromWCharArray(L"可自提"));
-            }
-            else
-            {
-                emit printLog(QString::fromWCharArray(L"不可自提"));
-            }
-        }
-
-        if (pickup)
-        {
-            userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
-
-            PickupDateTime pickupDateTime;
-            if (!AppleDataParser::getPickupDateTime(responseData, pickupDateTime))
-            {
-                finishBuyWithError(userData, QString::fromWCharArray(L"获取自取日期时间失败"));
-            }
-            else
-            {
-                userData->m_pickupDateTime = pickupDateTime;
-                qInfo("[%s] query datetime result, date=%s, time start=%s, time end=%s",
-                      userData->m_buyResult.m_account.toStdString().c_str(),
-                      pickupDateTime.m_date.toStdString().c_str(),
-                      pickupDateTime.m_time["checkInStart"].toString().toStdString().c_str(),
-                      pickupDateTime.m_time["checkInEnd"].toString().toStdString().c_str());
-                enterStep(userData, STEP_SUBMIT_SHOP);
-            }
+            retryRequest(userData);
         }
         else
         {
-            userData->m_phoneAvailStatus = GoodsAvailStatus::NOT_HAVE;
-            if (userData->m_retryCount < MAX_SEARCH_SHOP_RETRY_COUNT)
-            {
-                retryRequest(userData);
-            }
-            else
-            {
-                finishBuyWithError(userData, QString::fromWCharArray(L"不可自提"));
-            }
+            finishBuyWithError(userData, QString::fromWCharArray(L"解析是否有货失败"));
         }
+        return;
     }
+
+    // 检查是否自提
+    bool pickup = false;
+    if (!AppleDataParser::checkIfPickup(responseData, pickup))
+    {
+        if (userData->m_retryCount < MAX_SELECT_SHOP_RETRY_COUNT)
+        {
+            retryRequest(userData);
+        }
+        else
+        {
+            finishBuyWithError(userData, QString::fromWCharArray(L"解析是否自提失败"));
+        }
+        return;
+    }
+
+    // 显示查询结果
+    if (userData->m_buyParam.m_enableDebug)
+    {
+        QString log;
+        if (pickup)
+        {
+            log += QString::fromWCharArray(L"可以自提");
+        }
+        else
+        {
+            log += QString::fromWCharArray(L"不可自提");
+        }
+
+        if (hasPhone)
+        {
+            log += QString::fromWCharArray(L", 有手机");
+        }
+        else
+        {
+            log += QString::fromWCharArray(L", 无手机");
+        }
+
+        if (hasRecommend)
+        {
+            log += QString::fromWCharArray(L", 有配件");
+        }
+        else
+        {
+            log += QString::fromWCharArray(L", 无配件");
+        }
+
+        emit printLog(log);
+    }
+
+    // 不可自提或无货，直接结束
+    if (!pickup || !hasPhone || !hasRecommend)
+    {
+        userData->m_phoneAvailStatus = GoodsAvailStatus::NOT_HAVE;
+        if (userData->m_retryCount < MAX_SELECT_SHOP_RETRY_COUNT)
+        {
+            retryRequest(userData);
+        }
+        else
+        {
+            finishBuyWithError(userData, QString::fromWCharArray(L"不可自提或无货"));
+        }
+        return;
+    }
+    userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
+
+    // 查询自取日期和时间
+    PickupDateTime pickupDateTime;
+    if (!AppleDataParser::getPickupDateTime(responseData, pickupDateTime))
+    {
+        if (userData->m_retryCount < MAX_SELECT_SHOP_RETRY_COUNT)
+        {
+            retryRequest(userData);
+        }
+        else
+        {
+            finishBuyWithError(userData, QString::fromWCharArray(L"获取自提日期时间失败"));
+        }
+        return;
+    }
+    qInfo("[%s] query datetime result, date=%s, time start=%s, time end=%s",
+          userData->m_buyResult.m_account.toStdString().c_str(),
+          pickupDateTime.m_date.toStdString().c_str(),
+          pickupDateTime.m_time["checkInStart"].toString().toStdString().c_str(),
+          pickupDateTime.m_time["checkInEnd"].toString().toStdString().c_str());
+    userData->m_pickupDateTime = pickupDateTime;
+
+    // 继续下一步
+    enterStep(userData, STEP_SUBMIT_SHOP);
+}
+
+void GoodsBuyer::handleSubmitShopResponse(BuyUserData* userData, QString& responseData)
+{
+    if (userData->m_buyParam.m_enableDebug)
+    {
+        saveDataToFile(responseData, "STEP_SUBMIT_SHOP.txt");
+    }
+
+    // 检查是否有货
+    bool hasPhone = false;
+    bool hasRecommend = false;
+    if (!getGoodsAvalibility(userData, responseData, hasPhone, hasRecommend))
+    {
+        finishBuyWithError(userData, QString::fromWCharArray(L"解析是否有货失败"));
+        return;
+    }
+
+    // 检查是否自提
+    bool pickup = false;
+    if (!AppleDataParser::checkIfPickup(responseData, pickup))
+    {
+        finishBuyWithError(userData, QString::fromWCharArray(L"解析是否自提失败"));
+        return;
+    }
+
+    // 不可自提或无货，直接结束
+    if (!pickup || !hasPhone || !hasRecommend)
+    {
+        finishBuyWithError(userData, QString::fromWCharArray(L"不可自提或无货"));
+        return;
+    }
+
+    // 继续下一步
+    enterStep(userData, STEP_REVIEW);
 }
 
 bool GoodsBuyer::getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend)
 {
-    QByteArray jsonData = responseData.toUtf8();
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
-    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(responseData);
+    if (goodsDetails.size() == 0)
     {
-        qCritical("failed to parse the search shop response data");
         return false;
     }
 
-    QJsonObject root = jsonDocument.object();
-    QVector<QString> keys;
-    keys.append("body");
-    keys.append("checkout");
-    keys.append("fulfillment");
-    keys.append("pickupTab");
-    keys.append("pickup");
-    keys.append("storeLocator");
-    keys.append("searchResults");
-    keys.append("d");
-    QJsonObject dJson;
-    if (!JsonUtil::findObject(root, keys, dJson) || !dJson.contains("retailStores"))
+    for (auto& goodDetail : goodsDetails)
     {
-        qCritical("failed to find the retailStores node");
-        return false;
-    }
-
-    QJsonArray retailStoresJson = dJson["retailStores"].toArray();
-    for (auto retailStoreItem : retailStoresJson)
-    {
-        QJsonObject retailStoreJson = retailStoreItem.toObject();
-        QString storeId = retailStoreJson["storeId"].toString();
-        if (storeId == userData->m_buyParam.m_buyingShop.m_storeNumber)
+        if (goodDetail.m_strStoreId == userData->m_buyParam.m_buyingShop.m_storeNumber)
         {
-            hasPhone = false;
-            hasRecommend = false;
-            QJsonArray lineItemAvailabilityJson = retailStoreJson["availability"].toObject()["lineItemAvailability"].toArray();
-            for (auto lineItem : lineItemAvailabilityJson)
-            {
-                QJsonObject lineItemJson = lineItem.toObject();
-                if (lineItemJson["partName"].toString().indexOf("iPhone") >= 0)
-                {
-                    hasPhone = lineItemJson["availableNowForLine"].toBool();
-                }
-                else
-                {
-                    hasRecommend = lineItemJson["availableNowForLine"].toBool();
-                }
-            }
+            hasPhone = goodDetail.m_hasPhone;
+            hasRecommend = goodDetail.m_hasRecommend;
             return true;
         }
     }
@@ -650,6 +666,7 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
         QString log = QString::fromWCharArray(L"账号(%1)下单成功")
                 .arg(userData->m_buyResult.m_account);
         emit printLog(log);
+        enterStep(userData, STEP_QUERY_ORDER_NO);
         return true;
     }
 
@@ -667,10 +684,7 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
             root["head"].toObject()["data"].toObject().contains("url"))
     {
         QString sorryUrl = root["head"].toObject()["data"].toObject()["url"].toString();
-        userData->m_buyResult.m_failReason = sorryUrl;
-        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                .arg(userData->m_buyResult.m_account, sorryUrl);
-        emit printLog(log);
+        finishBuyWithError(userData, sorryUrl);
         return true;
     }
 
@@ -679,10 +693,7 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
             root["body"].toObject()["meta"].toObject()["page"].toObject().contains("title"))
     {
         QString title = root["body"].toObject()["meta"].toObject()["page"].toObject()["title"].toString();
-        userData->m_buyResult.m_failReason = title;
-        QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                .arg(userData->m_buyResult.m_account, title);
-        emit printLog(log);
+        finishBuyWithError(userData, title);
         return true;
     }
 
@@ -693,10 +704,8 @@ bool GoodsBuyer::handleProcessResponse(BuyUserData* userData, QString& responseD
     {
         if (!hasPhone || !hasRecommend)
         {
-            userData->m_buyResult.m_failReason = AppleDataParser::getGoodsAvailabilityString(hasPhone, hasRecommend);
-            QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                    .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
-            emit printLog(log);
+            QString error = AppleDataParser::getGoodsAvailabilityString(hasPhone, hasRecommend);
+            finishBuyWithError(userData, error);
             return true;
         }
     }
@@ -720,43 +729,13 @@ bool GoodsBuyer::handleQueryOrderResponse(BuyUserData* userData, QString& data)
                 QString log = QString::fromWCharArray(L"账号(%1)订单号是%2")
                         .arg(userData->m_buyResult.m_account, orderNumber);
                 emit printLog(log);
+                m_buyResults.append(userData->m_buyResult);
                 return true;
             }
         }
     }
 
     return false;
-}
-
-void GoodsBuyer::getCreditCardInfo(QString cardNo, QString& cardNumberPrefix, QString& cardNoCipher)
-{
-    if (cardNo.size() < 7)
-    {
-        cardNumberPrefix = cardNo;
-    }
-    else
-    {
-        cardNumberPrefix = cardNo.left(4) + " " + cardNo.mid(4, 2);
-    }
-
-    QString publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUIrYPRsCjQNCEGNWmSp9Wz+5uSqK6nkwiBq254Q5taDOqZz0YGL3s1DnJPuBU+e8Dexm6GKW1kWxptTRtva5Eds8VhlAgph8RqIoKmOpb3uJOhSzBpkU28uWyi87VIMM2laXTsSGTpGjSdYjCbcYvMtFdvAycfuEuNn05bDZvUQEa+j9t4S0b2iH7/8LxLos/8qMomJfwuPwVRkE5s5G55FeBQDt/KQIEDvlg1N8omoAjKdfWtmOCK64XZANTG2TMnar/iXyegPwj05m443AYz8x5Uw/rHBqnpiQ4xg97Ewox+SidebmxGowKfQT3+McmnLYu/JURNlYYRy2lYiMwIDAQAB";
-    QByteArray publicKeyBytes = QByteArray::fromBase64(publicKey.toUtf8());
-    CryptoPP::ArraySource publicKeySource((const byte*)publicKeyBytes.data(), publicKeyBytes.length(), true);
-    CryptoPP::RSA::PublicKey rsaPublicKey;
-    rsaPublicKey.Load(publicKeySource);
-
-    CryptoPP::AutoSeededRandomPool rng;
-    CryptoPP::RSAES< CryptoPP::OAEP<CryptoPP::SHA256> >::Encryptor encryptor(rsaPublicKey);
-    std::string ciphertext;
-    CryptoPP::StringSource(cardNo.toUtf8(), true,
-        new CryptoPP::PK_EncryptorFilter(rng, encryptor,
-            new CryptoPP::StringSink(ciphertext)
-        )
-    );
-    QByteArray base64ByteArray = QByteArray(ciphertext.c_str(), ciphertext.length()).toBase64();
-    QString base64CipherText = QString::fromUtf8(base64ByteArray);
-    cardNoCipher = QString("{\"cipherText\":\"%1\",\"publicKeyHash\":\"DsCuZg+6iOaJUKt5gJMdb6rYEz9BgEsdtEXjVc77oAs=\"}")
-            .arg(base64CipherText);
 }
 
 void GoodsBuyer::retryRequest(BuyUserData* userData)

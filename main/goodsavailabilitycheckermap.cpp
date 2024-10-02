@@ -223,7 +223,10 @@ void GoodsAvailabilityCheckerMap::parseQueryData(const QString& data, QVector<Sh
                 m_reportData.m_shopQueryCount[shop.m_storeNumber] += 1;
                 if (goodsDetail.m_hasPhone && goodsDetail.m_hasRecommend)
                 {
-                    qInfo("%s has goods", goodsDetail.m_strStoreId.toStdString().c_str());
+                    qInfo("%s, %s, %s has goods",
+                          shop.m_name.toStdString().c_str(),
+                          shop.m_storeNumber.toStdString().c_str(),
+                          shop.m_postalCode.toStdString().c_str());
                     shops.append(shop);
                 }
                 break;
