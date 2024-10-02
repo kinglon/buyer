@@ -277,24 +277,6 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
             setPostMethod(curl, body);
         }
     }
-    else if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
-    {
-        QString url = userData->m_buyParam.m_appStoreHost
-                + QString("/shop/checkoutx/fulfillment?_a=select&_m=checkout.fulfillment.pickupTab.pickup.storeLocator");
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-        headers["X-Aos-Stk"] = userData->m_buyParam.m_xAosStk;
-        headers["X-Requested-With"] = "Fetch";
-        headers["X-Aos-Model-Page"] = "checkoutPage";
-        headers["Referer"] = userData->m_buyParam.m_appStoreHost
-                + "/shop/checkout?_s=Fulfillment-init";
-        curl = makeRequest(url, headers, userData->m_buyParam.m_cookies, proxyServer);
-        if (curl)
-        {
-            QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=%1&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%2")
-                    .arg(userData->m_buyParam.m_buyingShop.m_storeNumber, userData->m_buyParam.m_buyingShop.m_postalCode);
-            setPostMethod(curl, body);
-        }
-    }
     else if (userData->m_buyResult.m_currentStep == STEP_SUBMIT_SHOP)
     {
         QString url = userData->m_buyParam.m_appStoreHost
@@ -313,46 +295,22 @@ CURL* GoodsBuyer::makeBuyingRequest(BuyUserData* userData)
             body["checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores"] = "false";
             body["checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore"] = userData->m_buyParam.m_buyingShop.m_storeNumber;
             body["checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput"] = userData->m_buyParam.m_buyingShop.m_postalCode;
-            if (!userData->m_date.isEmpty())
+            if (!userData->m_pickupDateTime.m_date.isEmpty())
             {
-                QJsonObject& timeObj = userData->m_time;
-                if (timeObj.contains("checkInStart"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.startTime"]
-                            = timeObj["checkInStart"].toString();
-                }
-                if (timeObj.contains("checkInEnd"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.endTime"]
-                            = timeObj["checkInEnd"].toString();
-                }
-                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.date"] = userData->m_date;
+                QJsonObject& timeObj = userData->m_pickupDateTime.m_time;
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.startTime"] = timeObj["checkInStart"].toString();
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.endTime"] = timeObj["checkInEnd"].toString();
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.date"] = userData->m_pickupDateTime.m_date;
                 body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayEndTime"] = "";
                 body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotType"] = "";
                 body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRecommended"] = "false";
-                if (timeObj.contains("SlotId"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotId"]
-                            = timeObj["SlotId"].toString();
-                }
-                if (timeObj.contains("signKey"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.signKey"]
-                            = timeObj["signKey"].toString();
-                }
-                if (timeObj.contains("timeZone"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeZone"]
-                            = timeObj["timeZone"].toString();
-                }
-                if (timeObj.contains("timeSlotValue"))
-                {
-                    body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotValue"]
-                            = timeObj["timeSlotValue"].toString();
-                }
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotId"] = timeObj["SlotId"].toString();
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.signKey"] = timeObj["signKey"].toString();
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeZone"] = timeObj["timeZone"].toString();
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.timeSlotValue"] = timeObj["timeSlotValue"].toString();
                 body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.isRestricted"] = "false";
                 body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayStartTime"] = "";
-                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.displayStartTime"] = "";
+                body["checkout.fulfillment.pickupTab.pickup.timeSlot.dateTimeSlots.dayRadio"] = userData->m_pickupDateTime.m_dayRadio;
             }
             QString bodyData = getBodyString(body);
             setPostMethod(curl, bodyData);
@@ -469,81 +427,8 @@ void GoodsBuyer::handleResponse(CURL* curl)
 
     if (userData->m_buyResult.m_currentStep == STEP_SELECT_SHOP)
     {
-        if (userData->m_buyParam.m_enableDebug)
-        {
-            saveDataToFile(responseData, "STEP_SEARCH_SHOP.txt");
-        }
-
-        bool pickup = false;
-        if (!AppleDataParser::checkIfPickup(responseData, pickup))
-        {
-            retryRequest(userData);
-        }
-        else
-        {
-            if (userData->m_buyParam.m_enableDebug)
-            {
-                if (pickup)
-                {
-                    emit printLog(QString::fromWCharArray(L"可自提"));
-                }
-                else
-                {
-                    emit printLog(QString::fromWCharArray(L"不可自提"));
-                }
-            }
-
-            if (pickup)
-            {
-                userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
-                // 有手机就让它走下去
-                enterStep(userData, STEP_SUBMIT_SHOP);
-            }
-            else
-            {                
-                userData->m_phoneAvailStatus = GoodsAvailStatus::NOT_HAVE;
-                if (userData->m_retryCount < MAX_SEARCH_SHOP_RETRY_COUNT)
-                {
-                    retryRequest(userData);
-                }
-                else
-                {
-                    userData->m_buyResult.m_failReason = QString::fromWCharArray(L"不可自提");
-                    QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
-                            .arg(userData->m_buyResult.m_account, userData->m_buyResult.m_failReason);
-                    emit printLog(log);
-                    m_buyResults.append(userData->m_buyResult);
-                }
-            }
-        }
-    }
-    else if (userData->m_buyResult.m_currentStep == STEP_QUERY_DATETIME)
-    {
-        if (userData->m_buyParam.m_enableDebug)
-        {
-            saveDataToFile(responseData, "STEP_QUERY_DATETIME.txt");
-        }
-
-        handleQueryDateTimeResponse(userData, responseData);
-
-        QString checkInStart;
-        QString checkInEnd;
-        if (userData->m_time.contains("checkInStart"))
-        {
-            checkInStart = userData->m_time["checkInStart"].toString();
-        }
-        if (userData->m_time.contains("checkInEnd"))
-        {
-            checkInEnd = userData->m_time["checkInEnd"].toString();
-        }
-        qInfo("[%s] query datetime result, date=%s, time start=%s, time end=%s",
-              userData->m_buyResult.m_account.toStdString().c_str(),
-              userData->m_date.toStdString().c_str(),
-              checkInStart.toStdString().c_str(),
-              checkInEnd.toStdString().c_str());
-
-        enterStep(userData, STEP_SELECT_SHOP);
-    }
+        handleSelectShopResponse(userData, responseData);
+    }    
     else if (userData->m_buyResult.m_currentStep == STEP_SUBMIT_SHOP)
     {
         if (userData->m_buyParam.m_enableDebug)
@@ -639,109 +524,63 @@ void GoodsBuyer::handleResponse(CURL* curl)
     }
 }
 
-void GoodsBuyer::handleQueryDateTimeResponse(BuyUserData* userData, QString& responseData)
+void GoodsBuyer::handleSelectShopResponse(BuyUserData* userData, QString& responseData)
 {
-    QByteArray jsonData = responseData.toUtf8();
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
-    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    if (userData->m_buyParam.m_enableDebug)
     {
-        qCritical("failed to parse the query date time response data");
-        return;
+        saveDataToFile(responseData, "STEP_SELECT_SHOP.txt");
     }
 
-    QJsonObject root = jsonDocument.object();
-    if (!root.contains("body"))
+    bool pickup = false;
+    if (!AppleDataParser::checkIfPickup(responseData, pickup))
     {
-        return;
+        retryRequest(userData);
     }
-    QJsonObject bodyJson = root["body"].toObject();
-
-    if (!bodyJson.contains("checkout"))
+    else
     {
-        return;
-    }
-    QJsonObject checkoutJson = bodyJson["checkout"].toObject();
-
-    if (!checkoutJson.contains("fulfillment"))
-    {
-        return;
-    }
-    QJsonObject fulfillmentJson = checkoutJson["fulfillment"].toObject();
-
-    if (!fulfillmentJson.contains("pickupTab"))
-    {
-        return;
-    }
-    QJsonObject pickupTabJson = fulfillmentJson["pickupTab"].toObject();
-
-    if (!pickupTabJson.contains("pickup"))
-    {
-        return;
-    }
-    QJsonObject pickupJson = pickupTabJson["pickup"].toObject();
-
-    if (!pickupJson.contains("timeSlot"))
-    {
-        qInfo("not need to select datetime");
-        return;
-    }
-    QJsonObject timeSlotJson = pickupJson["timeSlot"].toObject();
-
-    if (!timeSlotJson.contains("dateTimeSlots"))
-    {
-        return;
-    }
-    QJsonObject dateTimeSlotsJson = timeSlotJson["dateTimeSlots"].toObject();
-
-    if (!dateTimeSlotsJson.contains("d"))
-    {
-        return;
-    }
-    QJsonObject dJson = dateTimeSlotsJson["d"].toObject();
-
-    if (!dJson.contains("pickUpDates"))
-    {
-        return;
-    }
-    QJsonArray pickUpDatesJson = dJson["pickUpDates"].toArray();
-    if (pickUpDatesJson.size() == 0)
-    {
-        qCritical("not have any date to buy");
-        return;
-    }
-
-    int randomNumber = QRandomGenerator::global()->bounded(pickUpDatesJson.size());
-    QJsonObject pickUpDateJson = pickUpDatesJson[randomNumber].toObject();
-    if (pickUpDateJson.contains("date"))
-    {
-        userData->m_date = pickUpDateJson["date"].toString();
-    }
-
-    if (!pickUpDateJson.contains("dayOfMonth"))
-    {
-        return;
-    }
-    QString day = pickUpDateJson["dayOfMonth"].toString();
-
-    if (!dJson.contains("timeSlotWindows"))
-    {
-        return;
-    }
-    QJsonArray timeSlotWindows = dJson["timeSlotWindows"].toArray();
-    for (auto timeSlotWindow : timeSlotWindows)
-    {
-        QJsonObject timeSlotWindowJson = timeSlotWindow.toObject();
-        if (timeSlotWindowJson.contains(day))
+        if (userData->m_buyParam.m_enableDebug)
         {
-            QJsonArray timeSlotsJson = timeSlotWindowJson[day].toArray();
-            if (timeSlotsJson.size() == 0)
+            if (pickup)
             {
-                return;
+                emit printLog(QString::fromWCharArray(L"可自提"));
             }
+            else
+            {
+                emit printLog(QString::fromWCharArray(L"不可自提"));
+            }
+        }
 
-            randomNumber = QRandomGenerator::global()->bounded(timeSlotsJson.size());
-            userData->m_time = timeSlotsJson[randomNumber].toObject();
-            break;
+        if (pickup)
+        {
+            userData->m_phoneAvailStatus = GoodsAvailStatus::HAVE;
+
+            PickupDateTime pickupDateTime;
+            if (!AppleDataParser::getPickupDateTime(responseData, pickupDateTime))
+            {
+                finishBuyWithError(userData, QString::fromWCharArray(L"获取自取日期时间失败"));
+            }
+            else
+            {
+                userData->m_pickupDateTime = pickupDateTime;
+                qInfo("[%s] query datetime result, date=%s, time start=%s, time end=%s",
+                      userData->m_buyResult.m_account.toStdString().c_str(),
+                      pickupDateTime.m_date.toStdString().c_str(),
+                      pickupDateTime.m_time["checkInStart"].toString().toStdString().c_str(),
+                      pickupDateTime.m_time["checkInEnd"].toString().toStdString().c_str());
+                enterStep(userData, STEP_SUBMIT_SHOP);
+            }
+        }
+        else
+        {
+            userData->m_phoneAvailStatus = GoodsAvailStatus::NOT_HAVE;
+            if (userData->m_retryCount < MAX_SEARCH_SHOP_RETRY_COUNT)
+            {
+                retryRequest(userData);
+            }
+            else
+            {
+                finishBuyWithError(userData, QString::fromWCharArray(L"不可自提"));
+            }
         }
     }
 }
@@ -935,6 +774,15 @@ void GoodsBuyer::enterStep(BuyUserData* userData, int step)
     {
         curl_multi_add_handle(m_multiHandle, nextCurl);
     }
+}
+
+void GoodsBuyer::finishBuyWithError(BuyUserData* userData, QString error)
+{
+    userData->m_buyResult.m_failReason = error;
+    QString log = QString::fromWCharArray(L"账号(%1)下单失败：%2")
+            .arg(userData->m_buyResult.m_account, error);
+    emit printLog(log);
+    m_buyResults.append(userData->m_buyResult);
 }
 
 void GoodsBuyer::saveDataToFile(const QString& data, QString fileName)

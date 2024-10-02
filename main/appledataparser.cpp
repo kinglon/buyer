@@ -2,6 +2,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QRandomGenerator>
 #include "jsonutil.h"
 
 AppleDataParser::AppleDataParser()
@@ -142,4 +143,72 @@ bool AppleDataParser::checkIfPickup(const QString& data, bool& pickup)
     }
 
     return true;
+}
+
+bool AppleDataParser::getPickupDateTime(const QString& data, PickupDateTime& pickupDateTime)
+{
+    QVector<PickupDateTime> pickupDayTimes;
+    QByteArray jsonData = data.toUtf8();
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonData);
+    if (jsonDocument.isNull() || jsonDocument.isEmpty())
+    {
+        qCritical("failed to parse data for pickup date time");
+        return false;
+    }
+
+    QJsonObject root = jsonDocument.object();
+    QVector<QString> keys;
+    keys.append("body");
+    keys.append("checkout");
+    keys.append("fulfillment");
+    keys.append("pickupTab");
+    keys.append("pickup");
+    keys.append("timeSlot");
+    keys.append("dateTimeSlots");
+    keys.append("d");
+    QJsonObject dJson;
+    if (!JsonUtil::findObject(root, keys, dJson))
+    {
+        qInfo("failed to find the dateTimeSlots node");
+        return true;
+    }
+
+    QString date = dJson["date"].toString();
+    QString dayRadio = dJson["dayRadio"].toString();
+    if (date.isEmpty() || dayRadio.isEmpty())
+    {
+        qCritical("date or dayRadio is empty");
+        return false;
+    }
+
+    QJsonArray timeSlotWindowsJson = dJson["timeSlotWindows"].toArray();
+    if (timeSlotWindowsJson.size() == 0)
+    {
+        qCritical("the size of timeSlotWindows is 0");
+        return false;
+    }
+
+    for (auto timeSlotWindow : timeSlotWindowsJson)
+    {
+        QJsonObject timeSlotWindowJson = timeSlotWindow.toObject();
+        if (timeSlotWindowJson.contains(dayRadio))
+        {
+            QJsonArray timeSlotsJson = timeSlotWindowJson[dayRadio].toArray();
+            if (timeSlotsJson.size() == 0)
+            {
+                qCritical("the size of timeSlots is 0");
+                return false;
+            }
+
+            int randomNumber = QRandomGenerator::global()->bounded(timeSlotsJson.size());
+            QJsonObject timeSlot = timeSlotsJson[randomNumber].toObject();
+            pickupDateTime.m_date = date;
+            pickupDateTime.m_dayRadio = dayRadio;
+            pickupDateTime.m_time = timeSlot;
+            return true;
+        }
+    }
+
+    qCritical("failed to find the timeslot of %s", date.toStdString().c_str());
+    return false;
 }

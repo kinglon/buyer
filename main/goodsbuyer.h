@@ -8,14 +8,14 @@
 #include <QQueue>
 #include "httpthread.h"
 #include "datamodel.h"
+#include "appledataparser.h"
 
 // 购买步骤
 #define STEP_SELECT_SHOP        1   // 选择店铺
-#define STEP_QUERY_DATETIME     2   // 查询领取日期和时间
-#define STEP_SUBMIT_SHOP        3   // 提交店铺
-#define STEP_REVIEW             4   // 确认订单
-#define STEP_PROCESS            5   // 处理订单
-#define STEP_QUERY_ORDER_NO     6   // 查询订单号
+#define STEP_SUBMIT_SHOP        2   // 提交店铺
+#define STEP_REVIEW             3   // 确认订单
+#define STEP_PROCESS            4   // 处理订单
+#define STEP_QUERY_ORDER_NO     5   // 查询订单号
 
 class BuyResult
 {
@@ -53,13 +53,13 @@ public:
 public:
     QString getStepName() const
     {
-        if (m_currentStep == STEP_QUERY_DATETIME)
+        if (m_currentStep == STEP_SELECT_SHOP)
         {
-            return QString::fromWCharArray(L"查询领取日期和时间");
+            return QString::fromWCharArray(L"选择店铺");
         }
-        else if (m_currentStep == STEP_SELECT_SHOP)
+        else if (m_currentStep == STEP_SUBMIT_SHOP)
         {
-            return QString::fromWCharArray(L"重新选择店铺");
+            return QString::fromWCharArray(L"提交店铺");
         }
         else if (m_currentStep == STEP_REVIEW)
         {
@@ -109,11 +109,8 @@ public:
     // pltn
     QString m_pltn;
 
-    // 领取日期
-    QString m_date;
-
-    // 领取时间
-    QJsonObject m_time;
+    // 领取的日期和时间
+    PickupDateTime m_pickupDateTime;
 
     // 上一次请求的时间, GetTickCount64()返回的值
     qint64 m_lastRequestTime = 0;
@@ -155,7 +152,7 @@ private:
 
     void handleResponse(CURL* curl);
 
-    void handleQueryDateTimeResponse(BuyUserData* userData, QString& responseData);
+    void handleSelectShopResponse(BuyUserData* userData, QString& responseData);
 
     // 获取手机配件是否有货
     bool getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend);
@@ -172,6 +169,9 @@ private:
 
     // 进入步骤
     void enterStep(BuyUserData* userData, int step);
+
+    // 结束购买，有错误
+    void finishBuyWithError(BuyUserData* userData, QString error);
 
     // 将data保存在C盘指定的文件名下
     void saveDataToFile(const QString& data, QString fileName);
