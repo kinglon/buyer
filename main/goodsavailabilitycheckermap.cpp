@@ -2,6 +2,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QFile>
 #include "settingmanager.h"
 #include "ippoolcontroller.h"
 #include "appledataparser.h"
@@ -18,6 +19,8 @@ GoodsAvailabilityCheckerMap::GoodsAvailabilityCheckerMap(QObject *parent)
     m_queryShopPostalCodes.push_back("542-0086");
     m_queryShopPostalCodes.push_back("460-0008");
     m_queryShopPostalCodes.push_back("810-0001");
+
+    m_maxReqCount = getTimeOutSeconds() * 1000 / SettingManager::getInstance()->m_queryGoodInterval;
 }
 
 QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
@@ -45,6 +48,10 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
         userDatas.append(userData);
     }
 
+    // 该间隔可以确保每个号按要求的时间内才会轮询到一次
+    int eachBuyInterval = m_buyParamIntervalMs / userDatas.size();
+    int reqIntervalMs = max(eachBuyInterval, SettingManager::getInstance()->m_queryGoodInterval);
+
     // 下一个用于发送的号索引
     int nextBuyParamIndex = 0;
 
@@ -63,7 +70,7 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
         qint64 now = GetTickCount64();
         qint64 buyParamElapse = now - userDatas[nextBuyParamIndex].m_lastSendTime;
         qint64 requestElapse = now - m_lastSendReqTimeMs;
-        if (buyParamElapse >= m_buyParamIntervalMs && requestElapse >= m_reqIntervalMs)
+        if (buyParamElapse >= m_buyParamIntervalMs && requestElapse >= reqIntervalMs)
         {
             int waitTime = 0;
             QString localIp = IpPoolController::getInstance()->getIp(waitTime);
@@ -76,7 +83,7 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
                     curl_multi_add_handle(multiHandle, curl);
                     m_reqCount++;
                     m_reportData.m_requestCount++;
-                    userDatas[nextBuyParamIndex].m_lastSendTime = GetTickCount64();
+                    userDatas[nextBuyParamIndex].updateSendTime();
                     m_lastSendReqTimeMs = GetTickCount64();
                     nextBuyParamIndex = (nextBuyParamIndex+1)%userDatas.size();
                 }
@@ -115,7 +122,7 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
                 getResponse(m->easy_handle, statusCode, data);
                 if (statusCode == 200)
                 {                    
-                    parseQueryData(data, availShops);
+                    handleResponse(m->easy_handle, data, availShops);
                 }
                 else
                 {
@@ -144,7 +151,7 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
 
         // 记录报告
         int elapse = GetTickCount64() - m_reportData.m_lastReportTime;
-        if (elapse >= 10000)
+        if (elapse >= 15000)
         {
             QString logContent = m_reportData.toString() + QString::fromWCharArray(L", 处理中请求次数=%1").arg(m_reqCount);
             emit printLog(logContent);
@@ -199,6 +206,7 @@ CURL* GoodsAvailabilityCheckerMap::makeQueryRequest(MapCheckerUserData* userData
         QString body = QString("checkout.fulfillment.pickupTab.pickup.storeLocator.showAllStores=false&checkout.fulfillment.pickupTab.pickup.storeLocator.selectStore=&checkout.fulfillment.pickupTab.pickup.storeLocator.searchInput=%1")
                 .arg(storePostalCode);
         setPostMethod(curl, body);
+        userData->m_shopPostalCode = storePostalCode;
         curl_easy_setopt(curl, CURLOPT_INTERFACE, userData->m_localIp.toStdString().c_str());
         curl_easy_setopt(curl, CURLOPT_PRIVATE, userData);
     }
@@ -206,11 +214,31 @@ CURL* GoodsAvailabilityCheckerMap::makeQueryRequest(MapCheckerUserData* userData
     return curl;
 }
 
-void GoodsAvailabilityCheckerMap::parseQueryData(const QString& data, QVector<ShopItem>& shops)
+void GoodsAvailabilityCheckerMap::handleResponse(CURL* curl, const QString& data, QVector<ShopItem>& shops)
 {
+    MapCheckerUserData* userData = nullptr;
+    curl_easy_getinfo(curl, CURLINFO_PRIVATE, &userData);
+    if (userData == nullptr)
+    {
+        return;
+    }
+
+    // 更新cookies
+    QMap<QString, QString> cookies = getCookies(curl);
+    m_buyParamManager->updateCookies(userData->m_account, cookies);
+
     QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(data);
     if (goodsDetails.size() == 0)
     {
+        qCritical("failed to parse goods detail for %s using %s",
+                  userData->m_shopPostalCode.toStdString().c_str(),
+                  userData->m_account.toStdString().c_str());
+        if (m_errorFileIndex < 5)
+        {
+            m_errorFileIndex++;
+            QString errorFileName = QString::fromWCharArray(L"goods_detail_empty_%1").arg(m_errorFileIndex);
+            saveDataToFile(data, errorFileName);
+        }
         return;
     }
 
@@ -223,10 +251,17 @@ void GoodsAvailabilityCheckerMap::parseQueryData(const QString& data, QVector<Sh
                 m_reportData.m_shopQueryCount[shop.m_storeNumber] += 1;
                 if (goodsDetail.m_hasPhone && goodsDetail.m_hasRecommend)
                 {
-                    qInfo("%s, %s, %s has goods",
+                    QString time;
+                    while (!userData->m_sendTimes.empty())
+                    {
+                        time += ", " + userData->m_sendTimes.front();
+                        userData->m_sendTimes.pop_front();
+                    }
+                    qInfo("%s, %s, %s has goods%s",
                           shop.m_name.toStdString().c_str(),
                           shop.m_storeNumber.toStdString().c_str(),
-                          shop.m_postalCode.toStdString().c_str());
+                          shop.m_postalCode.toStdString().c_str(),
+                          time.toStdString().c_str());
                     shops.append(shop);
                 }
                 break;
@@ -245,11 +280,24 @@ void GoodsAvailabilityCheckerMap::parseQueryData(const QString& data, QVector<Sh
     }
 }
 
+void GoodsAvailabilityCheckerMap::saveDataToFile(const QString& data, QString fileName)
+{
+    qInfo("save data to file: %s", fileName.toStdString().c_str());
+
+    QFile file(m_planDataPath + "\\" + fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        return;
+    }
+
+    QTextStream out(&file);
+    out << data;
+
+    file.close();
+}
+
 void GoodsAvailabilityCheckerMap::run()
 {
-    m_reqIntervalMs = SettingManager::getInstance()->m_queryGoodInterval;
-    m_maxReqCount = getTimeOutSeconds() * 1000 / m_reqIntervalMs;    
-
     // 查询是否有货
     QVector<ShopItem> shops = queryIfGoodsAvailable();
     emit checkFinish(this, new QVector<ShopItem>(shops));

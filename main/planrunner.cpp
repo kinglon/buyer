@@ -472,6 +472,7 @@ void PlanRunner::launchGoodsChecker()
                 }
             }
         }
+        goodsChecker->setPlanDataPath(m_planDataPath);
         goodsChecker->setShops(queryShops);
         goodsChecker->setLocalIps(LocalIpManager::getInstance()->getAllIps());
 

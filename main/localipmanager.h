@@ -4,6 +4,15 @@
 #include <QMap>
 #include <QVector>
 
+class IpCount
+{
+public:
+    QString m_ip;
+
+    // 被使用的次数
+    int m_count = 0;
+};
+
 class LocalIpManager
 {
 protected:
@@ -28,8 +37,7 @@ private:
     void getLocalIps();
 
 private:
-    // key: local ip, value: flag of using
-    QMap<QString, bool> m_localIp2IsUse;
+    QVector<IpCount> m_ipCounts;
 };
 
 #endif // LOCALIPMANAGER_H

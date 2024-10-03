@@ -21,38 +21,27 @@ void LocalIpManager::init()
 QVector<QString> LocalIpManager::getAllIps()
 {
     QVector<QString> ips;
-    for (auto it=m_localIp2IsUse.begin(); it!=m_localIp2IsUse.end(); it++)
+    for (auto it=m_ipCounts.begin(); it!=m_ipCounts.end(); it++)
     {
-        ips.append(it.key());
+        ips.append(it->m_ip);
     }
     return ips;
 }
 
 bool LocalIpManager::assignIps(int count, QVector<QString>& localIps)
 {
-    QVector<QString> ips;
-    for (auto it=m_localIp2IsUse.begin(); it!=m_localIp2IsUse.end(); it++)
-    {
-        if (!it.value())
-        {
-            ips.append(it.key());
-            if (ips.size() >= count)
-            {
-                break;
-            }
-        }
-    }
+    // 按次数升序排序
+    std::sort(m_ipCounts.begin(), m_ipCounts.end(), [](const IpCount& a, const IpCount& b) {
+            return a.m_count < b.m_count;
+        });
 
-    if (ips.size() < count)
+    localIps.clear();
+    for (int i=0; i<count; i++)
     {
-        return false;
+        IpCount& ipCount = m_ipCounts[i%m_ipCounts.size()];
+        localIps.append(ipCount.m_ip);
+        ipCount.m_count++;
     }
-
-    for (auto& ip : ips)
-    {
-        m_localIp2IsUse[ip] = true;
-    }
-    localIps = ips;
 
     return true;
 }
@@ -61,13 +50,24 @@ void LocalIpManager::releaseIps(const QVector<QString>& localIps)
 {
     for (auto& ip : localIps)
     {
-        m_localIp2IsUse[ip] = false;
+        for (auto& ipCount : m_ipCounts)
+        {
+            if (ipCount.m_ip == ip)
+            {
+                ipCount.m_count--;
+                if (ipCount.m_count < 0)
+                {
+                    ipCount.m_count = 0;
+                }
+                break;
+            }
+        }
     }
 }
 
 void LocalIpManager::getLocalIps()
 {
-    m_localIp2IsUse.clear();
+    m_ipCounts.clear();
     QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface& networkInterface : interfaces)
     {
@@ -82,10 +82,12 @@ void LocalIpManager::getLocalIps()
         {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol)
             {
-                m_localIp2IsUse[entry.ip().toString()] = false;
+                IpCount ipCount;
+                ipCount.m_ip = entry.ip().toString();
+                m_ipCounts.append(ipCount);
             }
         }
     }
 
-    qInfo("local ip count is %d", m_localIp2IsUse.size());
+    qInfo("local ip count is %d", m_ipCounts.size());
 }

@@ -186,7 +186,7 @@ private:
 
     QVector<BuyResult> m_buyResults;
 
-    // 购买计划数据目录，尾部有斜杆
+    // 购买计划数据目录，尾部没有斜杆
     QString m_planDataPath;
 
     // 统计每个步骤发送的次数

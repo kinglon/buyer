@@ -66,7 +66,7 @@ void LogBuffer::LogTimeInfoAndLevel(ELogLevel logLevel)
 
 	SYSTEMTIME st;
 	GetLocalTime(&st);
-    int nWtiteDone = _snwprintf_s(m_pBuffWritten, m_pBuffEnd - m_pBuffWritten, _TRUNCATE, L"<<%02d-%02d-%02d %02d:%02d:%02d#%s>>", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, strLevel.c_str());
+    int nWtiteDone = _snwprintf_s(m_pBuffWritten, m_pBuffEnd - m_pBuffWritten, _TRUNCATE, L"<<%02d-%02d-%02d %02d:%02d:%02d.%03d#%s>>", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, strLevel.c_str());
 	if (nWtiteDone > 0)
     {
 		m_pBuffWritten += nWtiteDone;

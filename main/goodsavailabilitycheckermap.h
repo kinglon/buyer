@@ -17,8 +17,28 @@ public:
     // 本地IP
     QString m_localIp;
 
+    // 查询使用的店铺邮编
+    QString m_shopPostalCode;
+
     // 上一次发送的时间 GetTickCount64返回值
     qint64 m_lastSendTime = 0;
+
+    // 最近2次发送的时间
+    QVector<QString> m_sendTimes;
+
+public:
+    void updateSendTime()
+    {
+        m_lastSendTime = GetTickCount64();
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        QString time = QString("%1:%2:%3").arg(st.wHour, st.wMinute, st.wSecond);
+        m_sendTimes.push_back(time);
+        if (m_sendTimes.size() > 2)
+        {
+            m_sendTimes.pop_front();
+        }
+    }
 };
 
 class MapCheckerReportData
@@ -88,7 +108,10 @@ private:
     // 构造查询请求
     CURL* makeQueryRequest(MapCheckerUserData* userData);
 
-    void parseQueryData(const QString& data, QVector<ShopItem>& availShops);
+    void handleResponse(CURL* curl, const QString& data, QVector<ShopItem>& availShops);
+
+    // 将data保存在指定的文件名下
+    void saveDataToFile(const QString& data, QString fileName);
 
 private:
     // 最大请求数
@@ -96,9 +119,6 @@ private:
 
     // 当前运行的请求数
     int m_reqCount = 0;
-
-    // 请求间隔毫秒数
-    int m_reqIntervalMs = 100;
 
     // 号使用间隔毫秒数
     int m_buyParamIntervalMs = 15000;
@@ -115,6 +135,9 @@ private:
     MapCheckerReportData m_reportData;
 
     QSharedPointer<BuyParamManager> m_buyParamManager;
+
+    // 控制获取失败时记录返回数据到文件
+    int m_errorFileIndex = 0;
 };
 
 #endif // GOODSAVAILABILITYCHECKERMAP_H

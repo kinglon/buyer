@@ -23,6 +23,8 @@ public:
     // 设置本地IP列表
     void setLocalIps(const QVector<QString>& localIps) { m_localIps = localIps; }
 
+    void setPlanDataPath(QString planDataPath) { m_planDataPath = planDataPath; }
+
 signals:
     // 有货的店铺
     void checkFinish(GoodsAvailabilityCheckerBase* checker, QVector<ShopItem>* shops);
@@ -42,6 +44,9 @@ protected:
 
     // 轮询使用本地IP，标识下一个使用的IP索引
     int m_nextLocalIpIndex = 0;
+
+    // 购买计划数据目录，尾部没有斜杆
+    QString m_planDataPath;
 };
 
 #endif // GOODSAVAILABILITYCHECKERBASE_H
