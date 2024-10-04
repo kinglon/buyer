@@ -242,7 +242,7 @@ class AppleUtil:
         try:
             # 查询有货的店铺
             url = (
-                        self.apple_host + '/shop/fulfillment-messages?searchNearby=true&parts.0={}/A&location={}'.
+                        self.apple_host + '/shop/fulfillment-messages?searchNearby=true&parts.0={}&location={}'.
                         format(item_skuid, data_model.store_postal_code))
             headers = self.get_common_request_header()
             self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
@@ -255,7 +255,7 @@ class AppleUtil:
             store_id = ''
             store_postal_code = ''
             for store in stores:
-                if store['partsAvailability'][item_skuid + '/A']['buyability']['isBuyable']:
+                if store['partsAvailability'][item_skuid]['buyability']['isBuyable']:
                     store_id = store['storeNumber']
                     store_postal_code = store['address']['postalCode']
                     if store_id == data_model.store:
@@ -269,7 +269,7 @@ class AppleUtil:
                 data_model.store_postal_code = store_postal_code
 
             # 选择店铺
-            url = (self.apple_host + '/shop/fulfillment-messages?store={}&little=false&sp=true&parts.0={}/A&mts.0=regular&fts=true'.
+            url = (self.apple_host + '/shop/fulfillment-messages?store={}&little=false&sp=true&parts.0={}&mts.0=regular&fts=true'.
                    format(store_id, item_skuid))
             headers = self.get_common_request_header()
             self.last_response = self.session.get(url, headers=headers, proxies=self.proxies, timeout=self.timeout)
@@ -280,7 +280,7 @@ class AppleUtil:
             self.cookies.update(cookies)
 
             # 添加配件
-            url = self.apple_host + '/shop/pdpAddToBag/{}/A'.format(item_skuid)
+            url = self.apple_host + '/shop/pdpAddToBag/{}'.format(item_skuid)
             headers = self.get_common_request_header()
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             body = 'product={}%2FA&atbtoken={}'.format(item_skuid, self.atbtoken)

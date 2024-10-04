@@ -133,6 +133,7 @@ bool SettingManager::importRecommends(QString recommendFilePath)
 
     QVector<RecommendedItem> recommendedItems;
     QTextStream in(&file);
+    in.setCodec("UTF-8");
     while (!in.atEnd())
     {
         QString line = in.readLine();
@@ -142,7 +143,7 @@ bool SettingManager::importRecommends(QString recommendFilePath)
             continue;
         }
 
-        int secondPos = line.indexOf("/A///", firstPos+3);
+        int secondPos = line.indexOf("///", firstPos+3);
         if (secondPos == -1)
         {
             continue;

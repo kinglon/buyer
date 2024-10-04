@@ -68,7 +68,7 @@ def test_v2():
     # product = 'MYDU3J'  # iPhone 16 128GB
     model = 'iphone-16-pro'
     product = 'MYWM3J'  # iPhone 16 Pro Max 512GB
-    recommended_item = 'HPQ32ZM'
+    recommended_item = 'HPQ32ZM/A'
     print('添加手机')
     if not apple_util.add_cart(model, product):
         return
