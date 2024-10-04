@@ -9,6 +9,12 @@
 
 #define APPLE_HOST "https://www.apple.com/jp"
 
+// 1个号达到3次失败就禁用
+#define MAX_FAILED_COUNT 3
+
+// 被禁用的号数达到10个就全部重新上号
+#define MAX_FAILED_ACCOUNT_COUNT 10
+
 GoodsAvailabilityCheckerMap::GoodsAvailabilityCheckerMap(QObject *parent)
     : GoodsAvailabilityCheckerBase{parent}
 {
@@ -60,10 +66,21 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
     QVector<ShopItem> availShops;
     while (!m_requestStop)
     {
+        // 模拟有货
         if (m_mockFinish)
         {
             availShops.append(m_shops[0]);
             break;
+        }
+
+        // 计算下一个可用的号
+        while (true)
+        {
+            if (userDatas[nextBuyParamIndex].m_failedCount < MAX_FAILED_COUNT)
+            {
+                break;
+            }
+            nextBuyParamIndex = (nextBuyParamIndex+1) % userDatas.size();
         }
 
         // 发送请求
@@ -123,6 +140,35 @@ QVector<ShopItem> GoodsAvailabilityCheckerMap::queryIfGoodsAvailable()
                 if (statusCode == 200)
                 {                    
                     handleResponse(m->easy_handle, data, availShops);
+
+                    // 检查是否需要禁用该号
+                    MapCheckerUserData* userData = nullptr;
+                    curl_easy_getinfo(m->easy_handle, CURLINFO_PRIVATE, &userData);
+                    if (userData && userData->m_failedCount >= MAX_FAILED_COUNT)
+                    {
+                        qCritical("stop to use %s to query", userData->m_account.toStdString().c_str());
+                        m_reportData.m_failedAccountCount++;
+                        if (m_reportData.m_failedAccountCount >= MAX_FAILED_ACCOUNT_COUNT)
+                        {
+                            qCritical("failed account count equal to %d, add cart again", m_reportData.m_failedAccountCount);
+                            m_requestStop = true;
+                        }
+
+                        else
+                        {
+                            int canUseCount = userDatas.size() - m_reportData.m_failedAccountCount;
+                            if (canUseCount > 0)
+                            {
+                                eachBuyInterval = m_buyParamIntervalMs / canUseCount;
+                                reqIntervalMs = max(eachBuyInterval, SettingManager::getInstance()->m_queryGoodInterval);
+                            }
+                            else
+                            {
+                                qCritical("not have account to query, add cart again");
+                                m_requestStop = true;
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -230,6 +276,7 @@ void GoodsAvailabilityCheckerMap::handleResponse(CURL* curl, const QString& data
     QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(data);
     if (goodsDetails.size() == 0)
     {
+        userData->m_failedCount++;
         qCritical("failed to parse goods detail for %s using %s",
                   userData->m_shopPostalCode.toStdString().c_str(),
                   userData->m_account.toStdString().c_str());

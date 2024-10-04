@@ -533,7 +533,8 @@ void PlanRunner::onGoodsCheckFinish(GoodsAvailabilityCheckerBase* checker, QVect
     }
     else
     {
-        printLog(QString::fromWCharArray(L"店铺没货"));
+        printLog(QString::fromWCharArray(L"监控内部遇到错误，重新启动购买计划"));
+        m_restart = true;
         emit runFinish(m_planId, false);
     }
 

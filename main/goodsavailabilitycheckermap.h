@@ -26,13 +26,16 @@ public:
     // 最近2次发送的时间
     QVector<QString> m_sendTimes;
 
+    // 该号监控失败的次数
+    int m_failedCount = 0;
+
 public:
     void updateSendTime()
     {
         m_lastSendTime = GetTickCount64();
         SYSTEMTIME st;
         GetLocalTime(&st);
-        QString time = QString("%1:%2:%3").arg(st.wHour, st.wMinute, st.wSecond);
+        QString time = QString("%1:%2:%3").arg(QString::number(st.wHour), QString::number(st.wMinute), QString::number(st.wSecond));
         m_sendTimes.push_back(time);
         if (m_sendTimes.size() > 2)
         {
@@ -59,6 +62,9 @@ public:
     // 配件是否有货
     bool m_hasRecommend = false;
 
+    // 失败的号数
+    int m_failedAccountCount = 0;
+
 public:
     void reset()
     {
@@ -81,8 +87,9 @@ public:
             shopQueryCountString += ", " + it.key() + "=" + QString::number(it.value());
         }
         qint64 elapse = GetTickCount64() - m_lastReportTime;
-        QString str = QString::fromWCharArray(L"%1, 时长=%2, 请求次数=%3%4")
-                .arg(goodsDetail, QString::number(elapse), QString::number(m_requestCount), shopQueryCountString);
+        QString str = QString::fromWCharArray(L"%1, 时长=%2, 请求次数=%3, 失败号数%4%5")
+                .arg(goodsDetail, QString::number(elapse), QString::number(m_requestCount),
+                     QString::number(m_failedAccountCount), shopQueryCountString);
         return str;
     }
 };

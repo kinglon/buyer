@@ -50,7 +50,7 @@ QVector<GoodsDetail> AppleDataParser::parseGoodsDetail(const QString& data)
             QJsonArray lineItemAvailabilityJson = retailStoreJson["availability"].toObject()["lineItemAvailability"].toArray();
             if (lineItemAvailabilityJson.size() != 2)
             {
-                qCritical("the party count is not 2");
+                qCritical("the party count is %d, not 2", lineItemAvailabilityJson.size());
                 continue;
             }
             for (auto lineItem : lineItemAvailabilityJson)
