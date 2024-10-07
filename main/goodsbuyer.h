@@ -135,6 +135,8 @@ public:
 
     void setName(QString name) { m_name = name; }
 
+    void setBuyRecommend(bool buyRecommend) { m_buyRecommend = buyRecommend; }
+
 protected:
     void run() override;
 
@@ -188,6 +190,9 @@ private:
 
     // 购买计划数据目录，尾部没有斜杆
     QString m_planDataPath;
+
+    // 标志是否有购买配件
+    bool m_buyRecommend = true;
 
     // 统计每个步骤发送的次数
     QMap<int, int> m_stepRequestCounts;

@@ -44,6 +44,7 @@ bool PlanRunner::start()
     }
     m_planName = plan->m_name;
     m_planDataPath = QString::fromStdWString(CImPath::GetDataPath()) + m_planName;
+    m_buyRecommend = !plan->m_recommendedSkuid.isEmpty();
 
     if (!launchAddCartRunner(plan))
     {
@@ -473,6 +474,7 @@ void PlanRunner::launchGoodsChecker()
             }
         }
         goodsChecker->setPlanDataPath(m_planDataPath);
+        goodsChecker->setBuyRecommend(m_buyRecommend);
         goodsChecker->setShops(queryShops);
         goodsChecker->setLocalIps(LocalIpManager::getInstance()->getAllIps());
 
@@ -578,6 +580,7 @@ bool PlanRunner::launchGoodsBuyer()
         GoodsBuyer* buyer = new GoodsBuyer();
         buyer->setParams(buyParams);
         buyer->setPlanDataPath(m_planDataPath);
+        buyer->setBuyRecommend(m_buyRecommend);
         buyer->setName(QString::fromWCharArray(L"购买线程%1").arg(i+1));
         connect(buyer, &GoodsBuyer::buyFinish, this, &PlanRunner::onGoodsBuyFinish);
         connect(buyer, &GoodsBuyer::printLog, this, &PlanRunner::printLog);

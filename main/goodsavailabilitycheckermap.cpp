@@ -273,7 +273,7 @@ void GoodsAvailabilityCheckerMap::handleResponse(CURL* curl, const QString& data
     QMap<QString, QString> cookies = getCookies(curl);
     m_buyParamManager->updateCookies(userData->m_account, cookies);
 
-    QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(data);
+    QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(m_buyRecommend, data);
     if (goodsDetails.size() == 0)
     {
         userData->m_failedCount++;

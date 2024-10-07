@@ -39,7 +39,8 @@ public:
     AppleDataParser();
 
     // 从苹果响应数据中解析每个店铺的商品情况
-    static QVector<GoodsDetail> parseGoodsDetail(const QString& data);
+    // buyRecommend 标志是否有购买配件
+    static QVector<GoodsDetail> parseGoodsDetail(bool buyRecommend, const QString& data);
 
     static QString getGoodsAvailabilityString(bool hasPhone, bool hasRecommend);
 

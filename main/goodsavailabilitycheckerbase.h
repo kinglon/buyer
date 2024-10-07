@@ -25,6 +25,8 @@ public:
 
     void setPlanDataPath(QString planDataPath) { m_planDataPath = planDataPath; }
 
+    void setBuyRecommend(bool buyRecommend) { m_buyRecommend = buyRecommend; }
+
 signals:
     // 有货的店铺
     void checkFinish(GoodsAvailabilityCheckerBase* checker, QVector<ShopItem>* shops);
@@ -47,6 +49,9 @@ protected:
 
     // 购买计划数据目录，尾部没有斜杆
     QString m_planDataPath;
+
+    // 标志是否有购买配件
+    bool m_buyRecommend = true;
 };
 
 #endif // GOODSAVAILABILITYCHECKERBASE_H

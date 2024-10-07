@@ -92,6 +92,8 @@ private:
 
     QString m_planDataPath;
 
+    bool m_buyRecommend = true;
+
     bool m_requestStop = false;
 
     QVector<GoodsAvailabilityCheckerBase*> m_goodsCheckers;

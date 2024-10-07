@@ -10,7 +10,7 @@ AppleDataParser::AppleDataParser()
 
 }
 
-QVector<GoodsDetail> AppleDataParser::parseGoodsDetail(const QString& data)
+QVector<GoodsDetail> AppleDataParser::parseGoodsDetail(bool buyRecommend, const QString& data)
 {
     QVector<GoodsDetail> goodsDetails;
     QByteArray jsonData = data.toUtf8();
@@ -48,21 +48,39 @@ QVector<GoodsDetail> AppleDataParser::parseGoodsDetail(const QString& data)
             GoodsDetail goodsDetail;
             goodsDetail.m_strStoreId = storeId;
             QJsonArray lineItemAvailabilityJson = retailStoreJson["availability"].toObject()["lineItemAvailability"].toArray();
-            if (lineItemAvailabilityJson.size() != 2)
+            if (buyRecommend)
             {
-                qCritical("the party count is %d, not 2", lineItemAvailabilityJson.size());
-                continue;
+                if (lineItemAvailabilityJson.size() != 2)
+                {
+                    qCritical("the party count is %d, not 2", lineItemAvailabilityJson.size());
+                    continue;
+                }
+                for (auto lineItem : lineItemAvailabilityJson)
+                {
+                    QJsonObject lineItemJson = lineItem.toObject();
+                    if (lineItemJson["partName"].toString().indexOf("iPhone") >= 0)
+                    {
+                        goodsDetail.m_hasPhone = lineItemJson["availableNowForLine"].toBool();
+                    }
+                    else
+                    {
+                        goodsDetail.m_hasRecommend = lineItemJson["availableNowForLine"].toBool();
+                    }
+                }
             }
-            for (auto lineItem : lineItemAvailabilityJson)
+            else
             {
-                QJsonObject lineItemJson = lineItem.toObject();
+                if (lineItemAvailabilityJson.size() != 1)
+                {
+                    qCritical("the party count is %d, not 1", lineItemAvailabilityJson.size());
+                    continue;
+                }
+
+                goodsDetail.m_hasRecommend = true;
+                QJsonObject lineItemJson = lineItemAvailabilityJson[0].toObject();
                 if (lineItemJson["partName"].toString().indexOf("iPhone") >= 0)
                 {
                     goodsDetail.m_hasPhone = lineItemJson["availableNowForLine"].toBool();
-                }
-                else
-                {
-                    goodsDetail.m_hasRecommend = lineItemJson["availableNowForLine"].toBool();
                 }
             }
             goodsDetails.append(goodsDetail);

@@ -638,7 +638,7 @@ void GoodsBuyer::handleSubmitShopResponse(BuyUserData* userData, QString& respon
 
 bool GoodsBuyer::getGoodsAvalibility(BuyUserData* userData, QString& responseData, bool& hasPhone, bool& hasRecommend)
 {
-    QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(responseData);
+    QVector<GoodsDetail> goodsDetails = AppleDataParser::parseGoodsDetail(m_buyRecommend, responseData);
     if (goodsDetails.size() == 0)
     {
         return false;
